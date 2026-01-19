@@ -29,8 +29,9 @@ COPY --from=frontend-build /app/frontend/dist ./public
 # Create data directory for JSON storage (will be mounted as volume in production)
 RUN mkdir -p /app/data && chown -R node:node /app/data
 
-# Set environment variable for data directory
+# Set environment variables
 ENV DATA_DIR=/app/data
+ENV PORT=8000
 
 USER node
 
