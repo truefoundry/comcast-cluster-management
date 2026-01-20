@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
 import { Searchbar } from "@/components/ui/searchbar"
+import { Spin } from "@/components/ui/spin"
 import {
   CreateDrawer,
   EditDrawer,
@@ -191,8 +192,11 @@ const ClusterManagement = () => {
 
   if (isLoading) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Spin size="large" />
+          <span className="text-muted-foreground text-sm">Loading configurations...</span>
+        </div>
       </div>
     )
   }
