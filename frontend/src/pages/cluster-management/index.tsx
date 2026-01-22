@@ -100,14 +100,18 @@ const ClusterManagement = () => {
   const handleCreateSubmit = async () => {
     setIsSubmitting(true)
     try {
+      // Use workspace.clusterId for consistency - allows backend to use single API call
+      const sourceWorkspace = workspaces.find(w => w.id === createFormData.sourceWorkspace)
+      const destWorkspace = workspaces.find(w => w.id === createFormData.destinationWorkspace)
+
       await clusterFallbackConfigService.create({
         source: {
-          clusterId: createFormData.sourceCluster,
+          clusterId: sourceWorkspace?.clusterId ?? createFormData.sourceCluster,
           workspaceId: createFormData.sourceWorkspace,
           jobId: createFormData.sourceJobId || undefined,
         },
         destination: {
-          clusterId: createFormData.destinationCluster,
+          clusterId: destWorkspace?.clusterId ?? createFormData.destinationCluster,
           workspaceId: createFormData.destinationWorkspace,
         },
       })
@@ -128,14 +132,18 @@ const ClusterManagement = () => {
 
     setIsSubmitting(true)
     try {
+      // Use workspace.clusterId for consistency - allows backend to use single API call
+      const sourceWorkspace = workspaces.find(w => w.id === editFormData.sourceWorkspace)
+      const destWorkspace = workspaces.find(w => w.id === editFormData.destinationWorkspace)
+
       await clusterFallbackConfigService.update(configToEdit.id, {
         source: {
-          clusterId: editFormData.sourceCluster,
+          clusterId: sourceWorkspace?.clusterId ?? editFormData.sourceCluster,
           workspaceId: editFormData.sourceWorkspace,
           jobId: editFormData.sourceJobId || undefined,
         },
         destination: {
-          clusterId: editFormData.destinationCluster,
+          clusterId: destWorkspace?.clusterId ?? editFormData.destinationCluster,
           workspaceId: editFormData.destinationWorkspace,
         },
       })

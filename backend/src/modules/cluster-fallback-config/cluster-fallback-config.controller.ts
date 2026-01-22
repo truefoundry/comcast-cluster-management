@@ -117,17 +117,16 @@ export class ClusterFallbackConfigController {
 
   /**
    * Get user's accessible cluster and workspace IDs
+   * Derives cluster IDs from workspaces since frontend now uses workspace.clusterId
    */
   private async getUserAccessibleResources(
     authToken: string,
   ): Promise<{ clusterIds: Set<string>; workspaceIds: Set<string> }> {
-    const [clustersResponse, workspacesResponse] = await Promise.all([
-      this.externalDataService.getClusters(authToken),
-      this.externalDataService.getWorkspaces(authToken),
-    ]);
+    const workspacesResponse =
+      await this.externalDataService.getWorkspaces(authToken);
 
     return {
-      clusterIds: new Set(clustersResponse.data.map((c) => c.id)),
+      clusterIds: new Set(workspacesResponse.data.map((w) => w.clusterId)),
       workspaceIds: new Set(workspacesResponse.data.map((w) => w.id)),
     };
   }
