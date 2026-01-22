@@ -42,7 +42,10 @@ const DeleteDialog = ({
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isSubmitting}>Cancel</AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={(e) => {
+              e.preventDefault()
+              onConfirm()
+            }}
             disabled={isSubmitting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
