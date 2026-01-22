@@ -12,6 +12,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -47,6 +48,17 @@ export class ClusterFallbackConfigController {
   }
 
   /**
+   * Require auth token - throws UnauthorizedException if not present
+   */
+  private requireAuthToken(authHeader?: string): string {
+    const authToken = this.getAuthToken(authHeader);
+    if (!authToken) {
+      throw new UnauthorizedException('Authentication required');
+    }
+    return authToken;
+  }
+
+  /**
    * Get user ID from auth token
    */
   private async getUserId(authHeader?: string): Promise<string | undefined> {
@@ -72,33 +84,31 @@ export class ClusterFallbackConfigController {
     @Headers('authorization') authHeader: string,
     @Body() createDto: CreateClusterFallbackConfigDto,
   ): Promise<ClusterFallbackConfigResponse> {
-    const authToken = this.getAuthToken(authHeader);
+    const authToken = this.requireAuthToken(authHeader);
 
-    if (authToken) {
-      const { clusterIds, workspaceIds } =
-        await this.getUserAccessibleResources(authToken);
+    const { clusterIds, workspaceIds } =
+      await this.getUserAccessibleResources(authToken);
 
-      // Check access to source cluster/workspace
-      const hasSourceAccess =
-        clusterIds.has(createDto.source.clusterId) &&
-        workspaceIds.has(createDto.source.workspaceId);
+    // Check access to source cluster/workspace
+    const hasSourceAccess =
+      clusterIds.has(createDto.source.clusterId) &&
+      workspaceIds.has(createDto.source.workspaceId);
 
-      if (!hasSourceAccess) {
-        throw new ForbiddenException(
-          'You do not have access to the specified source cluster/workspace',
-        );
-      }
+    if (!hasSourceAccess) {
+      throw new ForbiddenException(
+        'You do not have access to the specified source cluster/workspace',
+      );
+    }
 
-      // Check access to destination cluster/workspace
-      const hasDestinationAccess =
-        clusterIds.has(createDto.destination.clusterId) &&
-        workspaceIds.has(createDto.destination.workspaceId);
+    // Check access to destination cluster/workspace
+    const hasDestinationAccess =
+      clusterIds.has(createDto.destination.clusterId) &&
+      workspaceIds.has(createDto.destination.workspaceId);
 
-      if (!hasDestinationAccess) {
-        throw new ForbiddenException(
-          'You do not have access to the specified destination cluster/workspace',
-        );
-      }
+    if (!hasDestinationAccess) {
+      throw new ForbiddenException(
+        'You do not have access to the specified destination cluster/workspace',
+      );
     }
 
     const userId = await this.getUserId(authHeader);
@@ -154,12 +164,7 @@ export class ClusterFallbackConfigController {
     @Query('sourceClusterId') sourceClusterId?: string,
     @Query('sourceWorkspaceId') sourceWorkspaceId?: string,
   ): Promise<ClusterFallbackConfigResponse[]> {
-    const authToken = this.getAuthToken(authHeader);
-
-    if (!authToken) {
-      // No auth - return empty list
-      return [];
-    }
+    const authToken = this.requireAuthToken(authHeader);
 
     // Fetch user's accessible clusters and workspaces in parallel
     const { clusterIds, workspaceIds } =
@@ -192,18 +197,16 @@ export class ClusterFallbackConfigController {
     @Headers('authorization') authHeader: string,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ClusterFallbackConfigResponse> {
-    const authToken = this.getAuthToken(authHeader);
+    const authToken = this.requireAuthToken(authHeader);
     const config = await this.configService.findOne(id);
 
-    if (authToken) {
-      const { clusterIds, workspaceIds } =
-        await this.getUserAccessibleResources(authToken);
+    const { clusterIds, workspaceIds } =
+      await this.getUserAccessibleResources(authToken);
 
-      if (!this.hasAccessToConfig(config, clusterIds, workspaceIds)) {
-        throw new ForbiddenException(
-          'You do not have access to this configuration',
-        );
-      }
+    if (!this.hasAccessToConfig(config, clusterIds, workspaceIds)) {
+      throw new ForbiddenException(
+        'You do not have access to this configuration',
+      );
     }
 
     return config;
@@ -218,44 +221,42 @@ export class ClusterFallbackConfigController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateClusterFallbackConfigDto,
   ): Promise<ClusterFallbackConfigResponse> {
-    const authToken = this.getAuthToken(authHeader);
+    const authToken = this.requireAuthToken(authHeader);
 
     // First check access to the existing config
     const existingConfig = await this.configService.findOne(id);
 
-    if (authToken) {
-      const { clusterIds, workspaceIds } =
-        await this.getUserAccessibleResources(authToken);
+    const { clusterIds, workspaceIds } =
+      await this.getUserAccessibleResources(authToken);
 
-      if (!this.hasAccessToConfig(existingConfig, clusterIds, workspaceIds)) {
+    if (!this.hasAccessToConfig(existingConfig, clusterIds, workspaceIds)) {
+      throw new ForbiddenException(
+        'You do not have access to this configuration',
+      );
+    }
+
+    // Also check access to new source/destination if being updated
+    if (updateDto.source) {
+      const hasNewSourceAccess =
+        clusterIds.has(updateDto.source.clusterId) &&
+        workspaceIds.has(updateDto.source.workspaceId);
+
+      if (!hasNewSourceAccess) {
         throw new ForbiddenException(
-          'You do not have access to this configuration',
+          'You do not have access to the specified source cluster/workspace',
         );
       }
+    }
 
-      // Also check access to new source/destination if being updated
-      if (updateDto.source) {
-        const hasNewSourceAccess =
-          clusterIds.has(updateDto.source.clusterId) &&
-          workspaceIds.has(updateDto.source.workspaceId);
+    if (updateDto.destination) {
+      const hasNewDestinationAccess =
+        clusterIds.has(updateDto.destination.clusterId) &&
+        workspaceIds.has(updateDto.destination.workspaceId);
 
-        if (!hasNewSourceAccess) {
-          throw new ForbiddenException(
-            'You do not have access to the specified source cluster/workspace',
-          );
-        }
-      }
-
-      if (updateDto.destination) {
-        const hasNewDestinationAccess =
-          clusterIds.has(updateDto.destination.clusterId) &&
-          workspaceIds.has(updateDto.destination.workspaceId);
-
-        if (!hasNewDestinationAccess) {
-          throw new ForbiddenException(
-            'You do not have access to the specified destination cluster/workspace',
-          );
-        }
+      if (!hasNewDestinationAccess) {
+        throw new ForbiddenException(
+          'You do not have access to the specified destination cluster/workspace',
+        );
       }
     }
 
@@ -271,18 +272,16 @@ export class ClusterFallbackConfigController {
     @Headers('authorization') authHeader: string,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
-    const authToken = this.getAuthToken(authHeader);
+    const authToken = this.requireAuthToken(authHeader);
 
-    if (authToken) {
-      const config = await this.configService.findOne(id);
-      const { clusterIds, workspaceIds } =
-        await this.getUserAccessibleResources(authToken);
+    const config = await this.configService.findOne(id);
+    const { clusterIds, workspaceIds } =
+      await this.getUserAccessibleResources(authToken);
 
-      if (!this.hasAccessToConfig(config, clusterIds, workspaceIds)) {
-        throw new ForbiddenException(
-          'You do not have access to this configuration',
-        );
-      }
+    if (!this.hasAccessToConfig(config, clusterIds, workspaceIds)) {
+      throw new ForbiddenException(
+        'You do not have access to this configuration',
+      );
     }
 
     return this.configService.remove(id);
