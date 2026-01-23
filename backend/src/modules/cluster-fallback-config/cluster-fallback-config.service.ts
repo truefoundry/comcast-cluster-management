@@ -47,15 +47,16 @@ export class ClusterFallbackConfigService {
   // ============================================================
   private storage: JsonStorage<ClusterFallbackConfigRecord>;
 
-  constructor(
+  constructor() {
     // ============================================================
     // TypeORM Repository (Uncomment when ready to use PostgreSQL)
     // ============================================================
     // @InjectRepository(ClusterFallbackConfig)
     // private readonly configRepository: Repository<ClusterFallbackConfig>,
-  ) {
     // JSON file storage initialization
-    this.storage = new JsonStorage<ClusterFallbackConfigRecord>('cluster-fallback-configs.json');
+    this.storage = new JsonStorage<ClusterFallbackConfigRecord>(
+      'cluster-fallback-configs.json',
+    );
   }
 
   /**
@@ -153,6 +154,48 @@ export class ClusterFallbackConfigService {
     //   order: { createdAt: 'DESC' },
     // });
     // return configs.map((config) => this.toResponse(config));
+  }
+
+  /**
+   * Find all configurations filtered by accessible clusters and workspaces
+   */
+  async findAllForUser(
+    accessibleClusterIds: Set<string>,
+    accessibleWorkspaceIds: Set<string>,
+  ): Promise<ClusterFallbackConfigResponse[]> {
+    // JSON Storage implementation
+    const records = this.storage.findBy((record) => {
+      // User must have access to BOTH source and destination clusters/workspaces
+      const hasSourceAccess =
+        accessibleClusterIds.has(record.sourceClusterId) &&
+        accessibleWorkspaceIds.has(record.sourceWorkspaceId);
+
+      const hasDestinationAccess =
+        accessibleClusterIds.has(record.destinationClusterId) &&
+        accessibleWorkspaceIds.has(record.destinationWorkspaceId);
+
+      return hasSourceAccess && hasDestinationAccess;
+    });
+
+    return records.map((record) => this.toResponse(record));
+
+    // ============================================================
+    // TypeORM implementation (Uncomment when using PostgreSQL)
+    // ============================================================
+    // const configs = await this.configRepository.find({
+    //   order: { createdAt: 'DESC' },
+    // });
+    // return configs
+    //   .filter((config) => {
+    //     const hasSourceAccess =
+    //       accessibleClusterIds.has(config.sourceClusterId) &&
+    //       accessibleWorkspaceIds.has(config.sourceWorkspaceId);
+    //     const hasDestinationAccess =
+    //       accessibleClusterIds.has(config.destinationClusterId) &&
+    //       accessibleWorkspaceIds.has(config.destinationWorkspaceId);
+    //     return hasSourceAccess && hasDestinationAccess;
+    //   })
+    //   .map((config) => this.toResponse(config));
   }
 
   /**
