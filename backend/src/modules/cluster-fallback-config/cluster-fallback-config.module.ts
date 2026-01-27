@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 // import { TypeOrmModule } from '@nestjs/typeorm';
 import { ClusterFallbackConfigController } from './cluster-fallback-config.controller';
 import { ClusterFallbackConfigService } from './cluster-fallback-config.service';
+import { JobFallbackSchedulerService } from './job-fallback-scheduler.service';
 // import { ClusterFallbackConfig } from '../../entities';
 import { ExternalDataModule } from '../external-data';
 
@@ -12,7 +13,7 @@ import { ExternalDataModule } from '../external-data';
     ExternalDataModule,
   ],
   controllers: [ClusterFallbackConfigController],
-  providers: [ClusterFallbackConfigService],
+  providers: [ClusterFallbackConfigService, JobFallbackSchedulerService],
   exports: [ClusterFallbackConfigService],
 })
 export class ClusterFallbackConfigModule {}

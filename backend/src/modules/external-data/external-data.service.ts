@@ -52,6 +52,68 @@ interface TFUserInfo {
   tenantName?: string;
 }
 
+// Job Run types
+export interface JobRun {
+  id: string;
+  name: string;
+  applicationName: string;
+  deploymentVersion: string;
+  createdAt: number;
+  endTime?: number;
+  duration?: number;
+  command?: string;
+  totalRetries: number;
+  error?: string;
+  status: JobRunStatus;
+  triggeredBy?: string;
+  triggeredBySubject?: {
+    subjectId: string;
+    subjectType: string;
+    subjectSlug: string;
+    subjectDisplayName: string;
+  };
+  exitCode?: number;
+  sparkUi?: string;
+  applicationId: string;
+  deploymentId: string;
+}
+
+export enum JobRunStatus {
+  CREATED = 'CREATED',
+  SCHEDULED = 'SCHEDULED',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+// Deployment types
+export interface Deployment {
+  id: string;
+  applicationId: string;
+  manifest: Record<string, unknown>;
+  version?: string;
+}
+
+// Application creation types
+export interface CreateApplicationRequest {
+  manifest: Record<string, unknown>;
+  dryRun?: boolean;
+  forceDeploy?: boolean;
+  triggerOnDeploy?: boolean;
+}
+
+export interface CreateApplicationResponse {
+  application?: { id: string };
+  deployment: { id: string; applicationId: string };
+}
+
+// Job trigger types
+export interface TriggerJobRequest {
+  applicationId: string;
+  input?: Record<string, unknown>;
+}
+
 /**
  * External Data Service
  *
@@ -213,6 +275,151 @@ export class ExternalDataService {
       };
     } catch (error) {
       this.handleError(error, 'Failed to fetch user info');
+    }
+  }
+
+  /**
+   * Get job runs by cluster and workspace from TrueFoundry Internal API
+   */
+  async getJobRunsByClusterAndWorkspace(
+    authToken: string,
+    clusterId: string,
+    workspaceId: string,
+    options?: {
+      status?: JobRunStatus;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<{
+    data: JobRun[];
+    pagination: { total: number; offset: number; limit: number };
+  }> {
+    try {
+      const response = await this.httpClient.get<TFPaginatedResponse<JobRun>>(
+        '/api/svc/v1/internal/job-runs',
+        {
+          headers: { Authorization: authToken },
+          params: {
+            clusterId,
+            workspaceId,
+            status: options?.status,
+            limit: options?.limit ?? 100,
+            offset: options?.offset ?? 0,
+          },
+        },
+      );
+
+      return {
+        data: response.data.data,
+        pagination: response.data.pagination,
+      };
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to fetch job runs for cluster ${clusterId} and workspace ${workspaceId}`,
+      );
+    }
+  }
+
+  /**
+   * Get deployment by application ID and version from TrueFoundry
+   */
+  async getDeployment(
+    authToken: string,
+    applicationId: string,
+    deploymentVersion?: string,
+  ): Promise<Deployment> {
+    try {
+      const params: Record<string, string> = {};
+      if (deploymentVersion) {
+        params.version = deploymentVersion;
+      }
+
+      const response = await this.httpClient.get<Deployment>(
+        `/api/svc/v1/applications/${applicationId}/deployment`,
+        {
+          headers: { Authorization: authToken },
+          params,
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to fetch deployment for application ${applicationId}`,
+      );
+    }
+  }
+
+  /**
+   * Create an application on TrueFoundry
+   */
+  async createApplication(
+    authToken: string,
+    request: CreateApplicationRequest,
+  ): Promise<CreateApplicationResponse> {
+    try {
+      const response = await this.httpClient.post<CreateApplicationResponse>(
+        '/api/svc/v1/applications',
+        request,
+        {
+          headers: { Authorization: authToken },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'Failed to create application');
+    }
+  }
+
+  /**
+   * Trigger a job on TrueFoundry
+   */
+  async triggerJob(
+    authToken: string,
+    request: TriggerJobRequest,
+  ): Promise<{ jobRunId: string }> {
+    try {
+      const response = await this.httpClient.post<{ jobRunId: string }>(
+        `/api/svc/v1/applications/${request.applicationId}/trigger`,
+        { input: request.input },
+        {
+          headers: { Authorization: authToken },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to trigger job for application ${request.applicationId}`,
+      );
+    }
+  }
+
+  /**
+   * Terminate a job run on TrueFoundry
+   */
+  async terminateJobRun(
+    authToken: string,
+    deploymentId: string,
+    jobRunName: string,
+  ): Promise<void> {
+    try {
+      await this.httpClient.post(
+        `/api/svc/v1/deployments/${deploymentId}/job-runs/${jobRunName}/terminate`,
+        {},
+        {
+          headers: { Authorization: authToken },
+        },
+      );
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to terminate job run ${jobRunName} for deployment ${deploymentId}`,
+      );
     }
   }
 
