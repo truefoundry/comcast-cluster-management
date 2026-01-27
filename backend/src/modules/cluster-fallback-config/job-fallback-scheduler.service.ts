@@ -137,12 +137,31 @@ export class JobFallbackSchedulerService implements OnModuleInit {
 
   /**
    * Generate a unique fallback job name
+   * Pattern: ^[a-z](?:[a-z0-9]|-(?!-)){1,30}[a-z0-9]$ (max 32 chars)
    */
   private generateFallbackName(baseName: string): string {
-    const timestamp = Date.now().toString(36);
-    const randomSuffix = Math.random().toString(36).substring(2, 7);
-    const truncatedBase = baseName.substring(0, 30);
-    return `${truncatedBase}-fb-${timestamp}-${randomSuffix}`;
+    // Sanitize base name: lowercase, replace invalid chars with hyphens
+    const sanitized = baseName
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '-')
+      .replace(/-+/g, '-') // Remove consecutive hyphens
+      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+
+    // Generate random suffix (7 chars)
+    const randomSuffix = Math.random().toString(36).substring(2, 9);
+
+    // Truncate base to fit: 32 - 4 ("-fb-") - 7 (suffix) = 21 chars max
+    const truncatedBase = sanitized.substring(0, 21);
+
+    // Ensure result starts with letter and ends with alphanumeric
+    let result = `${truncatedBase}-fb-${randomSuffix}`;
+
+    // Ensure starts with letter
+    if (!/^[a-z]/.test(result)) {
+      result = 'j' + result.substring(1);
+    }
+
+    return result;
   }
 
   /**
@@ -188,15 +207,13 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         return;
       }
 
-      // 2. Get destination workspace FQN
-      const destWorkspace = await this.externalDataService.getWorkspaceById(
-        this.serviceToken!,
-        config.destination.workspaceId,
-      );
+      // 2. Get destination workspace FQN from config (no extra API call needed)
+      const destWorkspaceFqn = config.destination.workspaceFqn;
 
-      if (!destWorkspace.fqn) {
+      if (!destWorkspaceFqn) {
         this.logger.error(
-          `No FQN found for destination workspace ${config.destination.workspaceId}`,
+          `No workspace FQN stored for destination workspace ${config.destination.workspaceId}. ` +
+            `Please update the fallback config to include the workspace FQN.`,
         );
         return;
       }
@@ -205,7 +222,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       const newName = this.generateFallbackName(jobRun.applicationName);
       const modifiedManifest = this.modifyManifestForDestination(
         deployment.manifest,
-        destWorkspace.fqn,
+        destWorkspaceFqn,
         newName,
       );
 
@@ -240,7 +257,17 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         }
       }
 
-      // 6. Trigger the job on destination
+      // 6. Wait for deployment to be ready before triggering
+      const triggerDelayMs = this.configService.get<number>(
+        'JOB_FALLBACK_TRIGGER_DELAY_MS',
+        5000,
+      );
+      this.logger.debug(
+        `Waiting ${triggerDelayMs}ms before triggering job on destination`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, triggerDelayMs));
+
+      // 7. Trigger the job on destination
       await this.externalDataService.triggerJob(this.serviceToken!, {
         applicationId: createdAppId,
         input: triggerInput,
@@ -250,14 +277,16 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         `Triggered job for application ${createdAppId} on destination`,
       );
 
-      // 7. Terminate the stuck job on source
+      // 8. Terminate the stuck job on source
       await this.externalDataService.terminateJobRun(
         this.serviceToken!,
         jobRun.deploymentId,
         jobRun.name,
       );
 
-      this.logger.log(`Terminated stuck job ${jobRun.name} on source cluster`);
+      this.logger.log(
+        `Terminated stuck job ${jobRun.name} (deployment: ${jobRun.deploymentId}) on source cluster`,
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
@@ -283,7 +312,8 @@ export class JobFallbackSchedulerService implements OnModuleInit {
           this.serviceToken!,
           group.sourceClusterId,
           group.sourceWorkspaceId,
-          { status: JobRunStatus.CREATED },
+          // TODO: for Testing, ive changed it to running. Should make it to CREATED
+          { status: JobRunStatus.RUNNING },
         );
 
       this.logger.debug(

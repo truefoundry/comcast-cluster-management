@@ -28,6 +28,9 @@ export class ClusterFallbackConfig {
   @Column()
   destinationWorkspaceId: string;
 
+  @Column({ type: 'varchar', nullable: true })
+  destinationWorkspaceFqn: string | null;
+
   // Created by (TrueFoundry user ID)
   @Column({ type: 'varchar', nullable: true })
   createdBy: string | null;

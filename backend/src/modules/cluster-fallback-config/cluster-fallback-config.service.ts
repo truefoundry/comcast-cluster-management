@@ -21,6 +21,7 @@ interface ClusterFallbackConfigRecord extends StorageRecord {
   sourceJobId: string | null;
   destinationClusterId: string;
   destinationWorkspaceId: string;
+  destinationWorkspaceFqn: string | null;
   createdBy: string | null;
 }
 
@@ -34,6 +35,7 @@ export interface ClusterFallbackConfigResponse {
   destination: {
     clusterId: string;
     workspaceId: string;
+    workspaceFqn?: string;
   };
   createdBy?: string;
   createdAt: Date;
@@ -75,6 +77,7 @@ export class ClusterFallbackConfigService {
       destination: {
         clusterId: record.destinationClusterId,
         workspaceId: record.destinationWorkspaceId,
+        workspaceFqn: record.destinationWorkspaceFqn || undefined,
       },
       createdBy: record.createdBy || undefined,
       createdAt: new Date(record.createdAt),
@@ -119,6 +122,7 @@ export class ClusterFallbackConfigService {
       sourceJobId: createDto.source.jobId || null,
       destinationClusterId: createDto.destination.clusterId,
       destinationWorkspaceId: createDto.destination.workspaceId,
+      destinationWorkspaceFqn: createDto.destination.workspaceFqn || null,
       createdBy: createdBy || null,
     });
 
@@ -292,6 +296,7 @@ export class ClusterFallbackConfigService {
     if (updateDto.destination) {
       updates.destinationClusterId = updateDto.destination.clusterId;
       updates.destinationWorkspaceId = updateDto.destination.workspaceId;
+      updates.destinationWorkspaceFqn = updateDto.destination.workspaceFqn || null;
     }
 
     const record = this.storage.update(id, updates);

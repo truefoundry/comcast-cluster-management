@@ -41,6 +41,12 @@ When a stuck job is found:
 - If found, use that config's destination
 - If not found, use the first generic config for that source (if any)
 
+## Important: Workspace FQN
+
+The fallback config stores `destinationWorkspaceFqn` directly. This eliminates the need for an extra API call during job moves. When creating/editing a fallback config from the frontend, the workspace FQN is automatically captured from the selected workspace.
+
+**If you have existing configs without `workspaceFqn`:** Edit and re-save them through the frontend to populate this field.
+
 ## Environment Variables
 
 | Variable | Description | Default |
@@ -74,3 +80,4 @@ The scheduler will:
 2. Set `JOB_FALLBACK_ENABLED=true`
 3. Optionally adjust `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` (default: 60)
 4. Restart the backend service
+

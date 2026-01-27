@@ -113,6 +113,7 @@ const ClusterManagement = () => {
         destination: {
           clusterId: destWorkspace?.clusterId ?? createFormData.destinationCluster,
           workspaceId: createFormData.destinationWorkspace,
+          workspaceFqn: destWorkspace?.fqn,
         },
       })
       setCreateFormData(initialFormData)
@@ -145,6 +146,7 @@ const ClusterManagement = () => {
         destination: {
           clusterId: destWorkspace?.clusterId ?? editFormData.destinationCluster,
           workspaceId: editFormData.destinationWorkspace,
+          workspaceFqn: destWorkspace?.fqn,
         },
       })
       setIsEditDrawerOpen(false)

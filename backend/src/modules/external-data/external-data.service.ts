@@ -13,12 +13,14 @@ export interface Workspace {
   name: string;
   clusterId: string;
   fqn?: string;
+  tenantName?: string;
 }
 
 export interface UserInfo {
   id: string;
   name: string;
   email: string;
+  tenantName?: string;
 }
 
 interface TFPaginatedResponse<T> {
@@ -119,10 +121,19 @@ export interface TriggerJobRequest {
  *
  * Fetches clusters and workspaces from TrueFoundry API.
  */
+// Constants for TrueFoundry API
+const TFY_ASSUME_USER_HEADER = 'x-tfy-assume-user';
+const SFY_SUBJECT_TYPE = 'serviceaccount';
+const TFY_CONTROLLER_NAME = 'tfy-system';
+
 @Injectable()
 export class ExternalDataService {
   private readonly baseUrl: string;
   private readonly httpClient: AxiosInstance;
+  /** Cache tenant name per auth token to avoid repeated API calls */
+  private tenantCache = new Map<string, string>();
+  /** Assumed user for service account authorization */
+  private readonly assumedUser: string;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -130,10 +141,50 @@ export class ExternalDataService {
       'https://internal.devtest.truefoundry.tech',
     );
 
+    // Get the assumed user from config (for x-tfy-assume-user header)
+    this.assumedUser = this.configService.get<string>(
+      'SFY_ASSUMED_USER',
+      'truefoundry',
+    );
+
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
     });
+  }
+
+  /**
+   * Build the x-tfy-assume-user header value
+   * Format: serviceaccount/{tenantName}/{assumedUser}/{controllerName}
+   */
+  private buildAssumeUserHeader(tenantName: string): string {
+    return `${SFY_SUBJECT_TYPE}/${tenantName}/${this.assumedUser}/${TFY_CONTROLLER_NAME}`;
+  }
+
+  /**
+   * Get tenant name for the given auth token (cached)
+   * Falls back to user id if tenantName is not available
+   */
+  async getTenantName(authToken: string): Promise<string> {
+    // Check cache first
+    if (this.tenantCache.has(authToken)) {
+      return this.tenantCache.get(authToken)!;
+    }
+
+    // Fetch from user info
+    const userInfo = await this.getUserInfo(authToken);
+    // Use tenantName if available, otherwise fall back to id (for service accounts)
+    const tenant = userInfo.tenantName || userInfo.id;
+    if (!tenant) {
+      throw new HttpException(
+        'Tenant name not found in user info',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    // Cache and return
+    this.tenantCache.set(authToken, tenant);
+    return tenant;
   }
 
   /**
@@ -150,7 +201,7 @@ export class ExternalDataService {
     try {
       const response = await this.httpClient.get<
         TFPaginatedResponse<TFCluster>
-      >('/api/svc/v1/clusters', {
+      >('/v1/clusters', {
         headers: { Authorization: authToken },
         params: { limit, offset },
       });
@@ -174,7 +225,7 @@ export class ExternalDataService {
   async getClusterById(authToken: string, clusterId: string): Promise<Cluster> {
     try {
       const response = await this.httpClient.get<TFCluster>(
-        `/api/svc/v1/clusters/${clusterId}`,
+        `/v1/clusters/${clusterId}`,
         {
           headers: { Authorization: authToken },
         },
@@ -207,7 +258,7 @@ export class ExternalDataService {
     try {
       const response = await this.httpClient.get<
         TFPaginatedResponse<TFWorkspace>
-      >('/api/svc/v1/workspaces', {
+      >('/v1/workspaces', {
         headers: { Authorization: authToken },
         params: {
           limit: options?.limit ?? 100,
@@ -222,6 +273,7 @@ export class ExternalDataService {
           name: workspace.name,
           clusterId: workspace.clusterId,
           fqn: workspace.fqn,
+          tenantName: workspace.tenantName,
         })),
         pagination: response.data.pagination,
       };
@@ -239,7 +291,7 @@ export class ExternalDataService {
   ): Promise<Workspace> {
     try {
       const response = await this.httpClient.get<TFWorkspace>(
-        `/api/svc/v1/workspaces/${workspaceId}`,
+        `/v1/workspaces/${workspaceId}`,
         {
           headers: { Authorization: authToken },
         },
@@ -250,6 +302,7 @@ export class ExternalDataService {
         name: response.data.name,
         clusterId: response.data.clusterId,
         fqn: response.data.fqn,
+        tenantName: response.data.tenantName,
       };
     } catch (error) {
       this.handleError(error, `Failed to fetch workspace ${workspaceId}`);
@@ -261,17 +314,15 @@ export class ExternalDataService {
    */
   async getUserInfo(authToken: string): Promise<UserInfo> {
     try {
-      const response = await this.httpClient.get<TFUserInfo>(
-        '/api/svc/v1/users/info',
-        {
-          headers: { Authorization: authToken },
-        },
-      );
+      const response = await this.httpClient.get<TFUserInfo>('/v1/users/info', {
+        headers: { Authorization: authToken },
+      });
 
       return {
         id: response.data.id,
         name: response.data.name,
         email: response.data.email,
+        tenantName: response.data.tenantName,
       };
     } catch (error) {
       this.handleError(error, 'Failed to fetch user info');
@@ -296,7 +347,7 @@ export class ExternalDataService {
   }> {
     try {
       const response = await this.httpClient.get<TFPaginatedResponse<JobRun>>(
-        '/api/svc/v1/internal/job-runs',
+        '/v1/x/job-runs',
         {
           headers: { Authorization: authToken },
           params: {
@@ -330,20 +381,33 @@ export class ExternalDataService {
     deploymentVersion?: string,
   ): Promise<Deployment> {
     try {
+      // Get tenant name for authorization
+      const tenantName = await this.getTenantName(authToken);
+
       const params: Record<string, string> = {};
       if (deploymentVersion) {
         params.version = deploymentVersion;
       }
 
-      const response = await this.httpClient.get<Deployment>(
-        `/api/svc/v1/applications/${applicationId}/deployment`,
-        {
-          headers: { Authorization: authToken },
-          params,
+      const response = await this.httpClient.get<
+        TFPaginatedResponse<Deployment>
+      >(`/v1/apps/${applicationId}/deployments`, {
+        headers: {
+          Authorization: authToken,
+          [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
         },
-      );
+        params,
+      });
 
-      return response.data;
+      // API returns paginated response, get the first deployment
+      if (!response.data.data || response.data.data.length === 0) {
+        throw new HttpException(
+          `No deployment found for application ${applicationId}`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return response.data.data[0];
     } catch (error) {
       this.handleError(
         error,
@@ -360,11 +424,17 @@ export class ExternalDataService {
     request: CreateApplicationRequest,
   ): Promise<CreateApplicationResponse> {
     try {
+      // Get tenant name for authorization
+      const tenantName = await this.getTenantName(authToken);
+
       const response = await this.httpClient.post<CreateApplicationResponse>(
-        '/api/svc/v1/applications',
+        '/v1/apps',
         request,
         {
-          headers: { Authorization: authToken },
+          headers: {
+            Authorization: authToken,
+            [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+          },
         },
       );
 
@@ -382,11 +452,20 @@ export class ExternalDataService {
     request: TriggerJobRequest,
   ): Promise<{ jobRunId: string }> {
     try {
+      // Get tenant name for authorization
+      const tenantName = await this.getTenantName(authToken);
+
       const response = await this.httpClient.post<{ jobRunId: string }>(
-        `/api/svc/v1/applications/${request.applicationId}/trigger`,
-        { input: request.input },
+        '/v1/jobs/trigger',
         {
-          headers: { Authorization: authToken },
+          applicationId: request.applicationId,
+          params: request.input,
+        },
+        {
+          headers: {
+            Authorization: authToken,
+            [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+          },
         },
       );
 
@@ -401,6 +480,7 @@ export class ExternalDataService {
 
   /**
    * Terminate a job run on TrueFoundry
+   * Uses /v1/jobs/terminate with deploymentId and jobRunName params
    */
   async terminateJobRun(
     authToken: string,
@@ -408,17 +488,27 @@ export class ExternalDataService {
     jobRunName: string,
   ): Promise<void> {
     try {
+      // Get tenant name for authorization
+      const tenantName = await this.getTenantName(authToken);
+
       await this.httpClient.post(
-        `/api/svc/v1/deployments/${deploymentId}/job-runs/${jobRunName}/terminate`,
+        '/v1/jobs/terminate',
         {},
         {
-          headers: { Authorization: authToken },
+          params: {
+            deploymentId,
+            jobRunName,
+          },
+          headers: {
+            Authorization: authToken,
+            [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+          },
         },
       );
     } catch (error) {
       this.handleError(
         error,
-        `Failed to terminate job run ${jobRunName} for deployment ${deploymentId}`,
+        `Failed to terminate job run ${jobRunName} (deployment: ${deploymentId})`,
       );
     }
   }

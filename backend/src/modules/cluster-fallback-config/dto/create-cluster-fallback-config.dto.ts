@@ -28,6 +28,10 @@ export class DestinationClusterDto {
   @IsString()
   @IsNotEmpty()
   workspaceId: string;
+
+  @IsString()
+  @IsOptional()
+  workspaceFqn?: string;
 }
 
 export class CreateClusterFallbackConfigDto {
