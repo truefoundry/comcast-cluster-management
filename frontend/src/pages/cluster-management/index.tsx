@@ -74,7 +74,20 @@ const ClusterManagement = () => {
     fetchData()
   }, [fetchData])
 
-  // Filter data based on search query across all columns
+  // Create lookup maps for names (for search)
+  const clusterNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    clusters.forEach((c) => map.set(c.id, c.name))
+    return map
+  }, [clusters])
+
+  const workspaceNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    workspaces.forEach((w) => map.set(w.id, w.name))
+    return map
+  }, [workspaces])
+
+  // Filter data based on search query across all columns (IDs and names)
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) {
       return configurations
@@ -89,13 +102,18 @@ const ClusterManagement = () => {
         config.source.jobId ?? "",
         config.destination.clusterId,
         config.destination.workspaceId,
+        // Also search by names
+        clusterNameMap.get(config.source.clusterId) ?? "",
+        workspaceNameMap.get(config.source.workspaceId) ?? "",
+        clusterNameMap.get(config.destination.clusterId) ?? "",
+        workspaceNameMap.get(config.destination.workspaceId) ?? "",
       ]
 
       return searchableFields.some((field) =>
         field.toLowerCase().includes(query)
       )
     })
-  }, [searchQuery, configurations])
+  }, [searchQuery, configurations, clusterNameMap, workspaceNameMap])
 
   const handleCreateSubmit = async () => {
     setIsSubmitting(true)
@@ -258,6 +276,8 @@ const ClusterManagement = () => {
 
       <ClusterListTable
         data={filteredData}
+        clusters={clusters}
+        workspaces={workspaces}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
       />
