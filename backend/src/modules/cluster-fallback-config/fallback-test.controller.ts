@@ -281,13 +281,15 @@ export class FallbackTestController {
 
     for (const source of groupedSources.values()) {
       try {
-        // TODO: Change to CREATED for production
         const { data: jobRuns } =
           await this.externalDataService.getJobRunsByClusterAndWorkspace(
             token,
             source.sourceClusterId,
             source.sourceWorkspaceId,
-            { status: JobRunStatus.RUNNING, limit: 100 },
+            {
+              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+              limit: 100,
+            },
           );
 
         const nowMs = Date.now();
