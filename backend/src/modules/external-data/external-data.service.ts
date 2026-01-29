@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
@@ -128,12 +128,13 @@ const TFY_CONTROLLER_NAME = 'tfy-system';
 
 @Injectable()
 export class ExternalDataService {
+  private readonly logger = new Logger(ExternalDataService.name);
   private readonly baseUrl: string;
   private readonly httpClient: AxiosInstance;
-  /** Cache tenant name per auth token to avoid repeated API calls */
-  private tenantCache = new Map<string, string>();
   /** Assumed user for service account authorization */
   private readonly assumedUser: string;
+  /** Configured tenant name from TF_TENANT_NAME env var */
+  private readonly configuredTenantName: string | null;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -146,6 +147,10 @@ export class ExternalDataService {
       'SFY_ASSUMED_USER',
       'truefoundry',
     );
+
+    // Get tenant name directly from config (recommended for service tokens)
+    this.configuredTenantName =
+      this.configService.get<string>('TF_TENANT_NAME') || null;
 
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
@@ -162,29 +167,16 @@ export class ExternalDataService {
   }
 
   /**
-   * Get tenant name for the given auth token (cached)
-   * Falls back to user id if tenantName is not available
+   * Get tenant name from TF_TENANT_NAME env var (required)
    */
-  async getTenantName(authToken: string): Promise<string> {
-    // Check cache first
-    if (this.tenantCache.has(authToken)) {
-      return this.tenantCache.get(authToken)!;
-    }
-
-    // Fetch from user info
-    const userInfo = await this.getUserInfo(authToken);
-    // Use tenantName if available, otherwise fall back to id (for service accounts)
-    const tenant = userInfo.tenantName || userInfo.id;
-    if (!tenant) {
+  getTenantName(): string {
+    if (!this.configuredTenantName) {
       throw new HttpException(
-        'Tenant name not found in user info',
+        'TF_TENANT_NAME env var is required',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-
-    // Cache and return
-    this.tenantCache.set(authToken, tenant);
-    return tenant;
+    return this.configuredTenantName;
   }
 
   /**
@@ -331,13 +323,14 @@ export class ExternalDataService {
 
   /**
    * Get job runs by cluster and workspace from TrueFoundry Internal API
+   * Supports multiple statuses via repeated query params (status=X&status=Y)
    */
   async getJobRunsByClusterAndWorkspace(
     authToken: string,
     clusterId: string,
     workspaceId: string,
     options?: {
-      status?: JobRunStatus;
+      status?: JobRunStatus | JobRunStatus[];
       limit?: number;
       offset?: number;
     },
@@ -382,7 +375,7 @@ export class ExternalDataService {
   ): Promise<Deployment> {
     try {
       // Get tenant name for authorization
-      const tenantName = await this.getTenantName(authToken);
+      const tenantName = this.getTenantName();
 
       const params: Record<string, string> = {};
       if (deploymentVersion) {
@@ -425,7 +418,7 @@ export class ExternalDataService {
   ): Promise<CreateApplicationResponse> {
     try {
       // Get tenant name for authorization
-      const tenantName = await this.getTenantName(authToken);
+      const tenantName = this.getTenantName();
 
       const response = await this.httpClient.post<CreateApplicationResponse>(
         '/v1/apps',
@@ -453,7 +446,7 @@ export class ExternalDataService {
   ): Promise<{ jobRunId: string }> {
     try {
       // Get tenant name for authorization
-      const tenantName = await this.getTenantName(authToken);
+      const tenantName = this.getTenantName();
 
       const response = await this.httpClient.post<{ jobRunId: string }>(
         '/v1/jobs/trigger',
@@ -489,7 +482,7 @@ export class ExternalDataService {
   ): Promise<void> {
     try {
       // Get tenant name for authorization
-      const tenantName = await this.getTenantName(authToken);
+      const tenantName = this.getTenantName();
 
       await this.httpClient.post(
         '/v1/jobs/terminate',

@@ -306,18 +306,17 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     );
 
     try {
-      // Fetch job runs with CREATED status from the source
+      // Fetch job runs with CREATED and SCHEDULED status from the source
       const { data: jobRuns } =
         await this.externalDataService.getJobRunsByClusterAndWorkspace(
           this.serviceToken!,
           group.sourceClusterId,
           group.sourceWorkspaceId,
-          // TODO: for Testing, ive changed it to running. Should make it to CREATED
-          { status: JobRunStatus.RUNNING },
+          { status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED] },
         );
 
       this.logger.debug(
-        `Found ${jobRuns.length} CREATED job runs in source ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
+        `Found ${jobRuns.length} job runs (CREATED/SCHEDULED) in source ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
       );
 
       // Process each job run
