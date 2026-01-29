@@ -1,0 +1,45 @@
+name: cluster-management
+type: service
+image:
+  type: build
+  build_spec:
+    type: dockerfile
+    dockerfile_path: ./Dockerfile
+    build_context_path: ./
+  # `build_source.branch_name` and `build_source.ref` will automatically be patched during deployment.
+  build_source:
+    ref: cae37097488b607cbe8336846810010665647b67
+    type: git
+    repo_url: https://github.com/truefoundry/comcast-cluster-management
+    branch_name: main
+env:
+  PORT: '8000'
+  DATA_DIR: /app/data
+  NODE_ENV: production
+  TRUEFOUNDRY_API_URL: https://internal.devtest.truefoundry.tech
+ports:
+  - auth:
+      type: truefoundry_oauth
+    host: >-
+      cluster-management-vivek-ks-devtest-8000.tfy-usea1-ctl.devtest.truefoundry.tech
+    port: 8000
+    expose: true
+    protocol: TCP
+    app_protocol: http
+mounts:
+  - type: volume
+    mount_path: /app/data
+    volume_fqn: tfy-volume://tfy-usea1-devtest:vivek-ks-devtest:cluster-management-data
+replicas: 1
+resources:
+  node:
+    type: node_selector
+    capacity_type: spot_fallback_on_demand
+  cpu_limit: 0.5
+  cpu_request: 0.2
+  memory_limit: 500
+  memory_request: 200
+  ephemeral_storage_limit: 2000
+  ephemeral_storage_request: 1000
+workspace_fqn: tfy-usea1-devtest:vivek-ks-devtest
+allow_interception: false
