@@ -188,8 +188,16 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     jobRun: JobRun,
     config: ClusterFallbackConfigResponse,
   ): Promise<void> {
+    const tenantName = jobRun.tenantName;
+    if (!tenantName) {
+      this.logger.error(
+        `No tenantName found for job ${jobRun.name}. Cannot proceed with fallback.`,
+      );
+      return;
+    }
+
     this.logger.log(
-      `Moving stuck job ${jobRun.name} (app: ${jobRun.applicationId}) ` +
+      `Moving stuck job ${jobRun.name} (app: ${jobRun.applicationId}, tenant: ${tenantName}) ` +
         `from ${config.source.clusterId}/${config.source.workspaceId} ` +
         `to ${config.destination.clusterId}/${config.destination.workspaceId}`,
     );
@@ -200,6 +208,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         this.serviceToken!,
         jobRun.applicationId,
         jobRun.deploymentVersion,
+        tenantName,
       );
 
       if (!deployment.manifest) {
@@ -237,6 +246,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
           forceDeploy: true,
           triggerOnDeploy: false,
         },
+        tenantName,
       );
 
       const createdAppId =
@@ -276,10 +286,14 @@ export class JobFallbackSchedulerService implements OnModuleInit {
 
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          await this.externalDataService.triggerJob(this.serviceToken!, {
-            applicationId: createdAppId,
-            input: triggerInput,
-          });
+          await this.externalDataService.triggerJob(
+            this.serviceToken!,
+            {
+              applicationId: createdAppId,
+              input: triggerInput,
+            },
+            tenantName,
+          );
           this.logger.log(
             `Triggered job for application ${createdAppId} on destination`,
           );
@@ -311,6 +325,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         this.serviceToken!,
         jobRun.deploymentId,
         jobRun.name,
+        tenantName,
       );
 
       this.logger.log(

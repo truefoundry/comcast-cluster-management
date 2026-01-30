@@ -78,16 +78,17 @@ export class FallbackTestController {
 
   /**
    * Test 2: Get deployment by application ID
-   * GET /api/fallback-test/deployment?applicationId=XXX&version=YYY
+   * GET /api/fallback-test/deployment?applicationId=XXX&tenantName=YYY&version=ZZZ
    */
   @Get('deployment')
   async testGetDeployment(
     @Query('applicationId') applicationId: string,
+    @Query('tenantName') tenantName: string,
     @Query('version') version?: string,
   ) {
-    if (!applicationId) {
+    if (!applicationId || !tenantName) {
       throw new HttpException(
-        'applicationId is required',
+        'applicationId and tenantName are required',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -96,6 +97,7 @@ export class FallbackTestController {
       this.getServiceToken(),
       applicationId,
       version,
+      tenantName,
     );
   }
 
@@ -121,66 +123,92 @@ export class FallbackTestController {
   /**
    * Test 4: Create application (DRY RUN by default)
    * POST /api/fallback-test/create-application
-   * Body: { manifest: {...}, dryRun?: boolean }
+   * Body: { manifest: {...}, tenantName: "XXX", dryRun?: boolean }
    *
    * WARNING: Set dryRun=false to actually create the application!
    */
   @Post('create-application')
   async testCreateApplication(
-    @Body() body: { manifest: Record<string, unknown>; dryRun?: boolean },
+    @Body()
+    body: {
+      manifest: Record<string, unknown>;
+      tenantName: string;
+      dryRun?: boolean;
+    },
   ) {
-    if (!body.manifest) {
-      throw new HttpException('manifest is required', HttpStatus.BAD_REQUEST);
+    if (!body.manifest || !body.tenantName) {
+      throw new HttpException(
+        'manifest and tenantName are required',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const dryRun = body.dryRun !== false; // Default to true for safety
 
-    return this.externalDataService.createApplication(this.getServiceToken(), {
-      manifest: body.manifest,
-      dryRun,
-      forceDeploy: !dryRun,
-      triggerOnDeploy: false,
-    });
+    return this.externalDataService.createApplication(
+      this.getServiceToken(),
+      {
+        manifest: body.manifest,
+        dryRun,
+        forceDeploy: !dryRun,
+        triggerOnDeploy: false,
+      },
+      body.tenantName,
+    );
   }
 
   /**
    * Test 5: Trigger job
    * POST /api/fallback-test/trigger-job
-   * Body: { applicationId: "XXX", input?: {...} }
+   * Body: { applicationId: "XXX", tenantName: "YYY", input?: {...} }
    *
    * WARNING: This will actually trigger a job!
    */
   @Post('trigger-job')
   async testTriggerJob(
-    @Body() body: { applicationId: string; input?: Record<string, unknown> },
+    @Body()
+    body: {
+      applicationId: string;
+      tenantName: string;
+      input?: Record<string, unknown>;
+    },
   ) {
-    if (!body.applicationId) {
+    if (!body.applicationId || !body.tenantName) {
       throw new HttpException(
-        'applicationId is required',
+        'applicationId and tenantName are required',
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    return this.externalDataService.triggerJob(this.getServiceToken(), {
-      applicationId: body.applicationId,
-      input: body.input,
-    });
+    return this.externalDataService.triggerJob(
+      this.getServiceToken(),
+      {
+        applicationId: body.applicationId,
+        input: body.input,
+      },
+      body.tenantName,
+    );
   }
 
   /**
    * Test 6: Terminate job run
    * POST /api/fallback-test/terminate-job
-   * Body: { deploymentId: "XXX", jobRunName: "YYY" }
+   * Body: { deploymentId: "XXX", jobRunName: "YYY", tenantName: "ZZZ" }
    *
    * WARNING: This will actually terminate a job!
    */
   @Post('terminate-job')
   async testTerminateJob(
-    @Body() body: { deploymentId: string; jobRunName: string },
+    @Body()
+    body: {
+      deploymentId: string;
+      jobRunName: string;
+      tenantName: string;
+    },
   ) {
-    if (!body.deploymentId || !body.jobRunName) {
+    if (!body.deploymentId || !body.jobRunName || !body.tenantName) {
       throw new HttpException(
-        'deploymentId and jobRunName are required',
+        'deploymentId, jobRunName, and tenantName are required',
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -189,6 +217,7 @@ export class FallbackTestController {
       this.getServiceToken(),
       body.deploymentId,
       body.jobRunName,
+      body.tenantName,
     );
 
     return {

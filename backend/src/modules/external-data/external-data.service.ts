@@ -78,6 +78,7 @@ export interface JobRun {
   sparkUi?: string;
   applicationId: string;
   deploymentId: string;
+  tenantName?: string;
 }
 
 export enum JobRunStatus {
@@ -133,8 +134,6 @@ export class ExternalDataService {
   private readonly httpClient: AxiosInstance;
   /** Assumed user for service account authorization */
   private readonly assumedUser: string;
-  /** Configured tenant name from TF_TENANT_NAME env var */
-  private readonly configuredTenantName: string | null;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -148,10 +147,6 @@ export class ExternalDataService {
       'truefoundry',
     );
 
-    // Get tenant name directly from config (recommended for service tokens)
-    this.configuredTenantName =
-      this.configService.get<string>('TF_TENANT_NAME') || null;
-
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
@@ -164,19 +159,6 @@ export class ExternalDataService {
    */
   private buildAssumeUserHeader(tenantName: string): string {
     return `${SFY_SUBJECT_TYPE}/${tenantName}/${this.assumedUser}/${TFY_CONTROLLER_NAME}`;
-  }
-
-  /**
-   * Get tenant name from TF_TENANT_NAME env var (required)
-   */
-  getTenantName(): string {
-    if (!this.configuredTenantName) {
-      throw new HttpException(
-        'TF_TENANT_NAME env var is required',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-    return this.configuredTenantName;
   }
 
   /**
@@ -367,16 +349,15 @@ export class ExternalDataService {
 
   /**
    * Get deployment by application ID and version from TrueFoundry
+   * @param tenantName - Tenant name for authorization header
    */
   async getDeployment(
     authToken: string,
     applicationId: string,
-    deploymentVersion?: string,
+    deploymentVersion: string | undefined,
+    tenantName: string,
   ): Promise<Deployment> {
     try {
-      // Get tenant name for authorization
-      const tenantName = this.getTenantName();
-
       const params: Record<string, string> = {};
       if (deploymentVersion) {
         params.version = deploymentVersion;
@@ -411,15 +392,14 @@ export class ExternalDataService {
 
   /**
    * Create an application on TrueFoundry
+   * @param tenantName - Tenant name for authorization header
    */
   async createApplication(
     authToken: string,
     request: CreateApplicationRequest,
+    tenantName: string,
   ): Promise<CreateApplicationResponse> {
     try {
-      // Get tenant name for authorization
-      const tenantName = this.getTenantName();
-
       const response = await this.httpClient.post<CreateApplicationResponse>(
         '/v1/apps',
         request,
@@ -439,15 +419,14 @@ export class ExternalDataService {
 
   /**
    * Trigger a job on TrueFoundry
+   * @param tenantName - Tenant name for authorization header
    */
   async triggerJob(
     authToken: string,
     request: TriggerJobRequest,
+    tenantName: string,
   ): Promise<{ jobRunId: string }> {
     try {
-      // Get tenant name for authorization
-      const tenantName = this.getTenantName();
-
       const response = await this.httpClient.post<{ jobRunId: string }>(
         '/v1/jobs/trigger',
         {
@@ -474,16 +453,15 @@ export class ExternalDataService {
   /**
    * Terminate a job run on TrueFoundry
    * Uses /v1/jobs/terminate with deploymentId and jobRunName params
+   * @param tenantName - Tenant name for authorization header
    */
   async terminateJobRun(
     authToken: string,
     deploymentId: string,
     jobRunName: string,
+    tenantName: string,
   ): Promise<void> {
     try {
-      // Get tenant name for authorization
-      const tenantName = this.getTenantName();
-
       await this.httpClient.post(
         '/v1/jobs/terminate',
         {},
