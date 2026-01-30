@@ -33,6 +33,8 @@ export class JobFallbackSchedulerService implements OnModuleInit {
   private readonly stuckThresholdMinutes: number;
   private readonly enabled: boolean;
   private serviceToken: string | null = null;
+  /** Lock to prevent overlapping cron runs */
+  private isRunning = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -267,15 +269,42 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       );
       await new Promise((resolve) => setTimeout(resolve, triggerDelayMs));
 
-      // 7. Trigger the job on destination
-      await this.externalDataService.triggerJob(this.serviceToken!, {
-        applicationId: createdAppId,
-        input: triggerInput,
-      });
+      // 7. Trigger the job on destination with retry for "Active deployment not found" errors
+      const maxRetries = 3;
+      const retryDelayMs = 3000;
+      let lastError: Error | null = null;
 
-      this.logger.log(
-        `Triggered job for application ${createdAppId} on destination`,
-      );
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          await this.externalDataService.triggerJob(this.serviceToken!, {
+            applicationId: createdAppId,
+            input: triggerInput,
+          });
+          this.logger.log(
+            `Triggered job for application ${createdAppId} on destination`,
+          );
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
+          const isDeploymentNotReady = lastError.message.includes(
+            'Active deployment not found',
+          );
+
+          if (isDeploymentNotReady && attempt < maxRetries) {
+            this.logger.debug(
+              `Deployment not ready yet for ${createdAppId}, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxRetries})`,
+            );
+            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (lastError) {
+        throw lastError;
+      }
 
       // 8. Terminate the stuck job on source
       await this.externalDataService.terminateJobRun(
@@ -365,6 +394,15 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       return;
     }
 
+    // Skip if previous run is still in progress
+    if (this.isRunning) {
+      this.logger.warn(
+        'Skipping fallback check: Previous run still in progress',
+      );
+      return;
+    }
+
+    this.isRunning = true;
     this.logger.log('Starting job fallback check...');
 
     try {
@@ -390,6 +428,8 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(`Error in job fallback check: ${errorMsg}`);
+    } finally {
+      this.isRunning = false;
     }
   }
 }
