@@ -32,6 +32,8 @@ export class JobFallbackSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(JobFallbackSchedulerService.name);
   private readonly stuckThresholdMinutes: number;
   private readonly enabled: boolean;
+  private readonly triggerMaxRetries: number;
+  private readonly triggerRetryDelayMs: number;
   private serviceToken: string | null = null;
   /** Lock to prevent overlapping cron runs */
   private isRunning = false;
@@ -49,26 +51,34 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       'JOB_FALLBACK_ENABLED',
       false,
     );
+    this.triggerMaxRetries = this.configService.get<number>(
+      'JOB_FALLBACK_TRIGGER_MAX_RETRIES',
+      3,
+    );
+    this.triggerRetryDelayMs = this.configService.get<number>(
+      'JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS',
+      3000,
+    );
   }
 
   onModuleInit() {
-    const token = this.configService.get<string>('TF_SERVICE_API_TOKEN');
-    if (token) {
-      this.serviceToken = `Bearer ${token}`;
-      this.logger.log('Job fallback scheduler initialized with service token');
-    } else {
-      this.logger.warn(
-        'TF_SERVICE_API_TOKEN not configured. Job fallback scheduler will be disabled.',
-      );
+    if (!this.enabled) {
+      this.logger.log('Job fallback scheduler is disabled');
+      return;
     }
 
-    if (this.enabled) {
-      this.logger.log(
-        `Job fallback scheduler enabled. Stuck threshold: ${this.stuckThresholdMinutes} minutes`,
+    const token = this.configService.get<string>('TF_SERVICE_API_TOKEN');
+    if (!token) {
+      this.logger.error(
+        'TF_SERVICE_API_TOKEN not configured. Job fallback scheduler cannot start.',
       );
-    } else {
-      this.logger.log('Job fallback scheduler is disabled');
+      return;
     }
+
+    this.serviceToken = `Bearer ${token}`;
+    this.logger.log(
+      `Job fallback scheduler enabled. Stuck threshold: ${this.stuckThresholdMinutes} minutes`,
+    );
   }
 
   /**
@@ -182,6 +192,91 @@ export class JobFallbackSchedulerService implements OnModuleInit {
   }
 
   /**
+   * Trigger a job with retry logic for "Active deployment not found" errors
+   */
+  private async triggerJobWithRetry(
+    applicationId: string,
+    input: Record<string, unknown> | undefined,
+    tenantName: string,
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= this.triggerMaxRetries; attempt++) {
+      try {
+        await this.externalDataService.triggerJob(
+          this.serviceToken!,
+          { applicationId, input },
+          tenantName,
+        );
+        this.logger.log(
+          `Triggered job for application ${applicationId} on destination`,
+        );
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        const isDeploymentNotReady = lastError.message.includes(
+          'Active deployment not found',
+        );
+
+        if (isDeploymentNotReady && attempt < this.triggerMaxRetries) {
+          this.logger.debug(
+            `Deployment not ready yet for ${applicationId}, retrying in ${this.triggerRetryDelayMs}ms (attempt ${attempt}/${this.triggerMaxRetries})`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.triggerRetryDelayMs),
+          );
+        } else {
+          // Non-retryable error or max retries reached
+          break;
+        }
+      }
+    }
+
+    throw lastError!;
+  }
+
+  /**
+   * Terminate a job run with retry logic for transient errors
+   */
+  private async terminateJobWithRetry(
+    deploymentId: string,
+    jobRunName: string,
+    tenantName: string,
+  ): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= this.triggerMaxRetries; attempt++) {
+      try {
+        await this.externalDataService.terminateJobRun(
+          this.serviceToken!,
+          deploymentId,
+          jobRunName,
+          tenantName,
+        );
+        this.logger.log(
+          `Terminated stuck job ${jobRunName} (deployment: ${deploymentId}) on source cluster`,
+        );
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < this.triggerMaxRetries) {
+          this.logger.debug(
+            `Failed to terminate job ${jobRunName}, retrying in ${this.triggerRetryDelayMs}ms (attempt ${attempt}/${this.triggerMaxRetries})`,
+          );
+          await new Promise((resolve) =>
+            setTimeout(resolve, this.triggerRetryDelayMs),
+          );
+        } else {
+          break;
+        }
+      }
+    }
+
+    throw lastError!;
+  }
+
+  /**
    * Move a stuck job to the destination cluster/workspace
    */
   private async moveJobToDestination(
@@ -279,57 +374,14 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       );
       await new Promise((resolve) => setTimeout(resolve, triggerDelayMs));
 
-      // 7. Trigger the job on destination with retry for "Active deployment not found" errors
-      const maxRetries = 3;
-      const retryDelayMs = 3000;
-      let lastError: Error | null = null;
+      // 7. Trigger the job on destination with retry
+      await this.triggerJobWithRetry(createdAppId, triggerInput, tenantName);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          await this.externalDataService.triggerJob(
-            this.serviceToken!,
-            {
-              applicationId: createdAppId,
-              input: triggerInput,
-            },
-            tenantName,
-          );
-          this.logger.log(
-            `Triggered job for application ${createdAppId} on destination`,
-          );
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error instanceof Error ? error : new Error(String(error));
-          const isDeploymentNotReady = lastError.message.includes(
-            'Active deployment not found',
-          );
-
-          if (isDeploymentNotReady && attempt < maxRetries) {
-            this.logger.debug(
-              `Deployment not ready yet for ${createdAppId}, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxRetries})`,
-            );
-            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
-          } else {
-            break;
-          }
-        }
-      }
-
-      if (lastError) {
-        throw lastError;
-      }
-
-      // 8. Terminate the stuck job on source
-      await this.externalDataService.terminateJobRun(
-        this.serviceToken!,
+      // 8. Terminate the stuck job on source with retry
+      await this.terminateJobWithRetry(
         jobRun.deploymentId,
         jobRun.name,
         tenantName,
-      );
-
-      this.logger.log(
-        `Terminated stuck job ${jobRun.name} (deployment: ${jobRun.deploymentId}) on source cluster`,
       );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
