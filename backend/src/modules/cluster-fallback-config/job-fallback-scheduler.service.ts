@@ -393,6 +393,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
 
   /**
    * Process fallback for a single source (cluster + workspace)
+   * Paginates through all job runs to handle cases with >100 stuck jobs
    */
   private async processSourceFallback(
     group: GroupedFallbackConfigs,
@@ -402,37 +403,60 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     );
 
     try {
-      // Fetch job runs with CREATED and SCHEDULED status from the source
-      const { data: jobRuns } =
-        await this.externalDataService.getJobRunsByClusterAndWorkspace(
-          this.serviceToken!,
-          group.sourceClusterId,
-          group.sourceWorkspaceId,
-          { status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED] },
+      const pageSize = 100;
+      let offset = 0;
+      let totalProcessed = 0;
+
+      // Paginate through all job runs
+      while (true) {
+        const { data: jobRuns, pagination } =
+          await this.externalDataService.getJobRunsByClusterAndWorkspace(
+            this.serviceToken!,
+            group.sourceClusterId,
+            group.sourceWorkspaceId,
+            {
+              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+              limit: pageSize,
+              offset,
+            },
+          );
+
+        this.logger.debug(
+          `Fetched ${jobRuns.length} job runs (offset: ${offset}, total: ${pagination.total})`,
         );
 
-      this.logger.debug(
-        `Found ${jobRuns.length} job runs (CREATED/SCHEDULED) in source ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
-      );
+        // Process each job run in this page
+        for (const jobRun of jobRuns) {
+          // Skip if not stuck
+          if (!this.isJobStuck(jobRun)) {
+            continue;
+          }
 
-      // Process each job run
-      for (const jobRun of jobRuns) {
-        // Skip if not stuck
-        if (!this.isJobStuck(jobRun)) {
-          continue;
+          // Find matching config
+          const matchingConfig = this.findMatchingConfig(jobRun, group);
+          if (!matchingConfig) {
+            this.logger.debug(
+              `No matching fallback config for stuck job ${jobRun.name} (app: ${jobRun.applicationId})`,
+            );
+            continue;
+          }
+
+          // Move the job to destination
+          await this.moveJobToDestination(jobRun, matchingConfig);
+          totalProcessed++;
         }
 
-        // Find matching config
-        const matchingConfig = this.findMatchingConfig(jobRun, group);
-        if (!matchingConfig) {
-          this.logger.debug(
-            `No matching fallback config for stuck job ${jobRun.name} (app: ${jobRun.applicationId})`,
-          );
-          continue;
+        // Check if we've fetched all pages
+        offset += jobRuns.length;
+        if (offset >= pagination.total || jobRuns.length === 0) {
+          break;
         }
+      }
 
-        // Move the job to destination
-        await this.moveJobToDestination(jobRun, matchingConfig);
+      if (totalProcessed > 0) {
+        this.logger.log(
+          `Processed ${totalProcessed} stuck jobs from ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
+        );
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
