@@ -460,24 +460,19 @@ export class ExternalDataService {
 
   /**
    * Terminate a job run on TrueFoundry
-   * Uses /v1/jobs/terminate with deploymentId and jobRunName params
+   * Uses /api/svc/v1/jobRuns/terminate with jobRunId in body
    * @param tenantName - Tenant name for authorization header
    */
   async terminateJobRun(
     authToken: string,
-    deploymentId: string,
-    jobRunName: string,
+    jobRunId: string,
     tenantName: string,
   ): Promise<void> {
     try {
       await this.httpClient.post(
-        '/v1/jobs/terminate',
-        {},
+        '/v1/jobRuns/terminate',
+        { jobRunId },
         {
-          params: {
-            deploymentId,
-            jobRunName,
-          },
           headers: {
             Authorization: authToken,
             [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
@@ -485,10 +480,7 @@ export class ExternalDataService {
         },
       );
     } catch (error) {
-      this.handleError(
-        error,
-        `Failed to terminate job run ${jobRunName} (deployment: ${deploymentId})`,
-      );
+      this.handleError(error, `Failed to terminate job run ${jobRunId}`);
     }
   }
 

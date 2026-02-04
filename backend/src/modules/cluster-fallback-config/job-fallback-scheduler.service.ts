@@ -239,7 +239,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
    * Terminate a job run with retry logic for transient errors
    */
   private async terminateJobWithRetry(
-    deploymentId: string,
+    jobRunId: string,
     jobRunName: string,
     tenantName: string,
   ): Promise<void> {
@@ -249,12 +249,11 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       try {
         await this.externalDataService.terminateJobRun(
           this.serviceToken!,
-          deploymentId,
-          jobRunName,
+          jobRunId,
           tenantName,
         );
         this.logger.log(
-          `Terminated stuck job ${jobRunName} (deployment: ${deploymentId}) on source cluster`,
+          `Terminated stuck job ${jobRunName} (id: ${jobRunId}) on source cluster`,
         );
         return;
       } catch (error) {
@@ -378,11 +377,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       await this.triggerJobWithRetry(createdAppId, triggerInput, tenantName);
 
       // 8. Terminate the stuck job on source with retry
-      await this.terminateJobWithRetry(
-        jobRun.deploymentId,
-        jobRun.name,
-        tenantName,
-      );
+      await this.terminateJobWithRetry(jobRun.id, jobRun.name, tenantName);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(

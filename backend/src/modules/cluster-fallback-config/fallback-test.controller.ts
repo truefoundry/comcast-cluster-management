@@ -193,7 +193,7 @@ export class FallbackTestController {
   /**
    * Test 6: Terminate job run
    * POST /api/fallback-test/terminate-job
-   * Body: { deploymentId: "XXX", jobRunName: "YYY", tenantName: "ZZZ" }
+   * Body: { jobRunId: "XXX", tenantName: "YYY" }
    *
    * WARNING: This will actually terminate a job!
    */
@@ -201,27 +201,25 @@ export class FallbackTestController {
   async testTerminateJob(
     @Body()
     body: {
-      deploymentId: string;
-      jobRunName: string;
+      jobRunId: string;
       tenantName: string;
     },
   ) {
-    if (!body.deploymentId || !body.jobRunName || !body.tenantName) {
+    if (!body.jobRunId || !body.tenantName) {
       throw new HttpException(
-        'deploymentId, jobRunName, and tenantName are required',
+        'jobRunId and tenantName are required',
         HttpStatus.BAD_REQUEST,
       );
     }
 
     await this.externalDataService.terminateJobRun(
       this.getServiceToken(),
-      body.deploymentId,
-      body.jobRunName,
+      body.jobRunId,
       body.tenantName,
     );
 
     return {
-      message: `Job run ${body.jobRunName} (deployment: ${body.deploymentId}) terminated successfully`,
+      message: `Job run ${body.jobRunId} terminated successfully`,
     };
   }
 
