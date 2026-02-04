@@ -32,6 +32,15 @@ interface TFPaginatedResponse<T> {
   };
 }
 
+interface TFJobRunsPaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    hasMore: boolean;
+    offset: number;
+    limit: number;
+  };
+}
+
 interface TFCluster {
   id: string;
   fqn: string;
@@ -318,22 +327,21 @@ export class ExternalDataService {
     },
   ): Promise<{
     data: JobRun[];
-    pagination: { total: number; offset: number; limit: number };
+    pagination: { hasMore: boolean; offset: number; limit: number };
   }> {
     try {
-      const response = await this.httpClient.get<TFPaginatedResponse<JobRun>>(
-        '/v1/x/job-runs',
-        {
-          headers: { Authorization: authToken },
-          params: {
-            clusterId,
-            workspaceId,
-            status: options?.status,
-            limit: options?.limit ?? 100,
-            offset: options?.offset ?? 0,
-          },
+      const response = await this.httpClient.get<
+        TFJobRunsPaginatedResponse<JobRun>
+      >('/v1/x/job-runs', {
+        headers: { Authorization: authToken },
+        params: {
+          clusterId,
+          workspaceId,
+          status: options?.status,
+          limit: options?.limit ?? 100,
+          offset: options?.offset ?? 0,
         },
-      );
+      });
 
       return {
         data: response.data.data,

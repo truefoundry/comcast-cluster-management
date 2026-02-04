@@ -422,7 +422,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
           );
 
         this.logger.debug(
-          `Fetched ${jobRuns.length} job runs (offset: ${offset}, total: ${pagination.total})`,
+          `Fetched ${jobRuns.length} job runs (offset: ${offset}, hasMore: ${pagination.hasMore})`,
         );
 
         // Process each job run in this page
@@ -447,10 +447,10 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         }
 
         // Check if we've fetched all pages
-        offset += jobRuns.length;
-        if (offset >= pagination.total || jobRuns.length === 0) {
+        if (!pagination.hasMore || jobRuns.length === 0) {
           break;
         }
+        offset += jobRuns.length;
       }
 
       if (totalProcessed > 0) {
