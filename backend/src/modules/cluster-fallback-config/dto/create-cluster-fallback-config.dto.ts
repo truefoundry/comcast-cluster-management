@@ -31,7 +31,7 @@ export class DestinationClusterDto {
 
   @IsString()
   @IsOptional()
-  workspaceFqn?: string;
+  workspaceFqn: string;
 }
 
 export class CreateClusterFallbackConfigDto {

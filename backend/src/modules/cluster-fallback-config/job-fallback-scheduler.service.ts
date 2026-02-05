@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { withRetry } from '../../lib/retry';
 import { ExternalDataService, JobRun, JobRunStatus } from '../external-data';
 import {
   ClusterFallbackConfigService,
@@ -199,80 +200,54 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     input: Record<string, unknown> | undefined,
     tenantName: string,
   ): Promise<void> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.triggerMaxRetries; attempt++) {
-      try {
-        await this.externalDataService.triggerJob(
+    await withRetry(
+      () =>
+        this.externalDataService.triggerJob(
           this.serviceToken!,
           { applicationId, input },
           tenantName,
-        );
-        this.logger.log(
-          `Triggered job for application ${applicationId} on destination`,
-        );
-        return;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        const isDeploymentNotReady = lastError.message.includes(
-          'Active deployment not found',
-        );
-
-        if (isDeploymentNotReady && attempt < this.triggerMaxRetries) {
-          this.logger.debug(
-            `Deployment not ready yet for ${applicationId}, retrying in ${this.triggerRetryDelayMs}ms (attempt ${attempt}/${this.triggerMaxRetries})`,
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, this.triggerRetryDelayMs),
-          );
-        } else {
-          // Non-retryable error or max retries reached
-          break;
-        }
-      }
-    }
-
-    throw lastError!;
+        ),
+      {
+        maxRetries: this.triggerMaxRetries,
+        delayMs: this.triggerRetryDelayMs,
+        logger: this.logger,
+        operationName: 'triggerJob',
+        successMessage: `Triggered job for application ${applicationId} on destination`,
+        retryMessage: () =>
+          `Deployment not ready yet for ${applicationId}, retrying in ${this.triggerRetryDelayMs}ms`,
+        isRetryable: (error) =>
+          error.message.includes('Active deployment not found'),
+      },
+    );
   }
 
   /**
    * Terminate a job run with retry logic for transient errors
    */
   private async terminateJobWithRetry(
-    jobRunId: string,
+    deploymentId: string,
     jobRunName: string,
     tenantName: string,
   ): Promise<void> {
-    let lastError: Error | null = null;
-
-    for (let attempt = 1; attempt <= this.triggerMaxRetries; attempt++) {
-      try {
-        await this.externalDataService.terminateJobRun(
+    await withRetry(
+      () =>
+        this.externalDataService.terminateJobRun(
           this.serviceToken!,
-          jobRunId,
+          deploymentId,
+          jobRunName,
           tenantName,
-        );
-        this.logger.log(
-          `Terminated stuck job ${jobRunName} (id: ${jobRunId}) on source cluster`,
-        );
-        return;
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        if (attempt < this.triggerMaxRetries) {
-          this.logger.debug(
-            `Failed to terminate job ${jobRunName}, retrying in ${this.triggerRetryDelayMs}ms (attempt ${attempt}/${this.triggerMaxRetries})`,
-          );
-          await new Promise((resolve) =>
-            setTimeout(resolve, this.triggerRetryDelayMs),
-          );
-        } else {
-          break;
-        }
-      }
-    }
-
-    throw lastError!;
+        ),
+      {
+        maxRetries: this.triggerMaxRetries,
+        delayMs: this.triggerRetryDelayMs,
+        logger: this.logger,
+        operationName: 'terminateJob',
+        successMessage: `Terminated stuck job ${jobRunName} (deployment: ${deploymentId}) on source cluster`,
+        retryMessage: () =>
+          `Failed to terminate job ${jobRunName}, retrying in ${this.triggerRetryDelayMs}ms`,
+        // Retry on any error (transient errors)
+      },
+    );
   }
 
   /**
@@ -376,8 +351,8 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       // 7. Trigger the job on destination with retry
       await this.triggerJobWithRetry(createdAppId, triggerInput, tenantName);
 
-      // 8. Terminate the stuck job on source with retry
-      await this.terminateJobWithRetry(jobRun.id, jobRun.name, tenantName);
+      // 8. Terminate the stuck job on source with retry (use deployment.id from getDeployment response)
+      await this.terminateJobWithRetry(deployment.id, jobRun.name, tenantName);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       this.logger.error(
@@ -387,8 +362,44 @@ export class JobFallbackSchedulerService implements OnModuleInit {
   }
 
   /**
+   * Fetch all job runs from a cluster/workspace with pagination handling
+   * @returns All job runs matching the criteria
+   */
+  private async fetchAllJobRuns(
+    clusterId: string,
+    workspaceId: string,
+    status: JobRunStatus[],
+  ): Promise<JobRun[]> {
+    const allJobRuns: JobRun[] = [];
+    const pageSize = 100;
+    let offset = 0;
+
+    while (true) {
+      const { data: jobRuns, pagination } =
+        await this.externalDataService.getJobRunsByClusterAndWorkspace(
+          this.serviceToken!,
+          clusterId,
+          workspaceId,
+          { status, limit: pageSize, offset },
+        );
+
+      allJobRuns.push(...jobRuns);
+
+      this.logger.debug(
+        `Fetched ${jobRuns.length} job runs (offset: ${offset}, total so far: ${allJobRuns.length}, hasMore: ${pagination.hasMore})`,
+      );
+
+      if (!pagination.hasMore || jobRuns.length === 0) {
+        break;
+      }
+      offset += jobRuns.length;
+    }
+
+    return allJobRuns;
+  }
+
+  /**
    * Process fallback for a single source (cluster + workspace)
-   * Paginates through all job runs to handle cases with >100 stuck jobs
    */
   private async processSourceFallback(
     group: GroupedFallbackConfigs,
@@ -398,54 +409,40 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     );
 
     try {
-      const pageSize = 100;
-      let offset = 0;
-      let totalProcessed = 0;
+      // 1. Fetch all job runs at once
+      const allJobRuns = await this.fetchAllJobRuns(
+        group.sourceClusterId,
+        group.sourceWorkspaceId,
+        [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+      );
 
-      // Paginate through all job runs
-      while (true) {
-        const { data: jobRuns, pagination } =
-          await this.externalDataService.getJobRunsByClusterAndWorkspace(
-            this.serviceToken!,
-            group.sourceClusterId,
-            group.sourceWorkspaceId,
-            {
-              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
-              limit: pageSize,
-              offset,
-            },
-          );
+      // 2. Filter to stuck jobs only
+      const stuckJobs = allJobRuns.filter((jobRun) => this.isJobStuck(jobRun));
 
+      if (stuckJobs.length === 0) {
         this.logger.debug(
-          `Fetched ${jobRuns.length} job runs (offset: ${offset}, hasMore: ${pagination.hasMore})`,
+          `No stuck jobs found in ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
         );
+        return;
+      }
 
-        // Process each job run in this page
-        for (const jobRun of jobRuns) {
-          // Skip if not stuck
-          if (!this.isJobStuck(jobRun)) {
-            continue;
-          }
+      this.logger.debug(
+        `Found ${stuckJobs.length} stuck jobs out of ${allJobRuns.length} total`,
+      );
 
-          // Find matching config
-          const matchingConfig = this.findMatchingConfig(jobRun, group);
-          if (!matchingConfig) {
-            this.logger.debug(
-              `No matching fallback config for stuck job ${jobRun.name} (app: ${jobRun.applicationId})`,
-            );
-            continue;
-          }
-
-          // Move the job to destination
-          await this.moveJobToDestination(jobRun, matchingConfig);
-          totalProcessed++;
+      // 3. Process each stuck job
+      let totalProcessed = 0;
+      for (const jobRun of stuckJobs) {
+        const matchingConfig = this.findMatchingConfig(jobRun, group);
+        if (!matchingConfig) {
+          this.logger.debug(
+            `No matching fallback config for stuck job ${jobRun.name} (app: ${jobRun.applicationId})`,
+          );
+          continue;
         }
 
-        // Check if we've fetched all pages
-        if (!pagination.hasMore || jobRuns.length === 0) {
-          break;
-        }
-        offset += jobRuns.length;
+        await this.moveJobToDestination(jobRun, matchingConfig);
+        totalProcessed++;
       }
 
       if (totalProcessed > 0) {

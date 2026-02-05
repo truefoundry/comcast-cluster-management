@@ -201,25 +201,27 @@ export class FallbackTestController {
   async testTerminateJob(
     @Body()
     body: {
-      jobRunId: string;
+      deploymentId: string;
+      jobRunName: string;
       tenantName: string;
     },
   ) {
-    if (!body.jobRunId || !body.tenantName) {
+    if (!body.deploymentId || !body.jobRunName || !body.tenantName) {
       throw new HttpException(
-        'jobRunId and tenantName are required',
+        'deploymentId, jobRunName and tenantName are required',
         HttpStatus.BAD_REQUEST,
       );
     }
 
     await this.externalDataService.terminateJobRun(
       this.getServiceToken(),
-      body.jobRunId,
+      body.deploymentId,
+      body.jobRunName,
       body.tenantName,
     );
 
     return {
-      message: `Job run ${body.jobRunId} terminated successfully`,
+      message: `Job run ${body.jobRunName} (deployment: ${body.deploymentId}) terminated successfully`,
     };
   }
 
@@ -314,7 +316,7 @@ export class FallbackTestController {
             source.sourceClusterId,
             source.sourceWorkspaceId,
             {
-              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+              status: [JobRunStatus.RUNNING],
               limit: 100,
             },
           );
