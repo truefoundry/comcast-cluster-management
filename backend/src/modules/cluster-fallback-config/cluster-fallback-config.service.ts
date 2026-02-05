@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 // ============================================================
 // TypeORM imports (Uncomment when ready to use PostgreSQL)
 // ============================================================
@@ -85,6 +89,81 @@ export class ClusterFallbackConfigService {
     };
   }
 
+  /**
+   * Check for duplicate configurations
+   * Rules:
+   * - Only ONE generic config (no jobId) per source cluster/workspace
+   * - Only ONE job-specific config per source cluster/workspace/jobId
+   *
+   * @param sourceClusterId - Source cluster ID
+   * @param sourceWorkspaceId - Source workspace ID
+   * @param sourceJobId - Source job ID (null for generic config)
+   * @param excludeId - Optional ID to exclude (for update operations)
+   * @returns The duplicate record if found, null otherwise
+   */
+  private findDuplicateConfig(
+    sourceClusterId: string,
+    sourceWorkspaceId: string,
+    sourceJobId: string | null,
+    excludeId?: string,
+  ): ClusterFallbackConfigRecord | null {
+    const duplicates = this.storage.findBy((record) => {
+      // Exclude the current record (for updates)
+      if (excludeId && record.id === excludeId) {
+        return false;
+      }
+
+      // Match source cluster and workspace
+      if (
+        record.sourceClusterId !== sourceClusterId ||
+        record.sourceWorkspaceId !== sourceWorkspaceId
+      ) {
+        return false;
+      }
+
+      // For generic configs (no jobId), check if another generic config exists
+      if (sourceJobId === null) {
+        return record.sourceJobId === null;
+      }
+
+      // For job-specific configs, check if same jobId exists
+      return record.sourceJobId === sourceJobId;
+    });
+
+    return duplicates.length > 0 ? duplicates[0] : null;
+  }
+
+  /**
+   * Validate no duplicate config exists, throw ConflictException if found
+   */
+  private validateNoDuplicate(
+    sourceClusterId: string,
+    sourceWorkspaceId: string,
+    sourceJobId: string | null,
+    excludeId?: string,
+  ): void {
+    const duplicate = this.findDuplicateConfig(
+      sourceClusterId,
+      sourceWorkspaceId,
+      sourceJobId,
+      excludeId,
+    );
+
+    if (duplicate) {
+      if (sourceJobId === null) {
+        throw new ConflictException(
+          `A generic fallback config already exists for source cluster "${sourceClusterId}" and workspace "${sourceWorkspaceId}". ` +
+            `Only one generic config (without jobId) is allowed per source cluster/workspace combination.`,
+        );
+      } else {
+        throw new ConflictException(
+          `A fallback config already exists for source cluster "${sourceClusterId}", workspace "${sourceWorkspaceId}", and job "${sourceJobId}". ` +
+            `Only one config per source cluster/workspace/job combination is allowed.`,
+        );
+      }
+    }
+  }
+
   // ============================================================
   // TypeORM version of toResponse (Uncomment when using PostgreSQL)
   // ============================================================
@@ -115,6 +194,13 @@ export class ClusterFallbackConfigService {
     createDto: CreateClusterFallbackConfigDto,
     createdBy?: string,
   ): Promise<ClusterFallbackConfigResponse> {
+    // Validate no duplicate config exists
+    this.validateNoDuplicate(
+      createDto.source.clusterId,
+      createDto.source.workspaceId,
+      createDto.source.jobId || null,
+    );
+
     // JSON Storage implementation
     const record = this.storage.create({
       sourceClusterId: createDto.source.clusterId,
@@ -283,6 +369,16 @@ export class ClusterFallbackConfigService {
 
     if (!existing) {
       throw new NotFoundException(`Configuration with ID ${id} not found`);
+    }
+
+    // If source is being updated, validate no duplicate exists (excluding current record)
+    if (updateDto.source) {
+      this.validateNoDuplicate(
+        updateDto.source.clusterId,
+        updateDto.source.workspaceId,
+        updateDto.source.jobId || null,
+        id, // Exclude current record from duplicate check
+      );
     }
 
     const updates: Partial<ClusterFallbackConfigRecord> = {};

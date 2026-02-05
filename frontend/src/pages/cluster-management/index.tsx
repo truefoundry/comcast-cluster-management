@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { Searchbar } from "@/components/ui/searchbar"
 import { Spin } from "@/components/ui/spin"
 import {
@@ -13,6 +14,7 @@ import {
   clusterFallbackConfigService,
   externalDataService,
 } from "@/lib/services"
+import { getErrorMessage } from "@/lib/utils"
 
 const initialFormData: ConfigurationFormData = {
   sourceCluster: "",
@@ -136,11 +138,15 @@ const ClusterManagement = () => {
       })
       setCreateFormData(initialFormData)
       setIsCreateDrawerOpen(false)
+      toast.success("Configuration created successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to create configuration:", err)
-      setError("Failed to create configuration. Please try again.")
+      setIsCreateDrawerOpen(false)
+      toast.error("Failed to create configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -169,11 +175,16 @@ const ClusterManagement = () => {
       })
       setIsEditDrawerOpen(false)
       setConfigToEdit(null)
+      toast.success("Configuration updated successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to update configuration:", err)
-      setError("Failed to update configuration. Please try again.")
+      setIsEditDrawerOpen(false)
+      setConfigToEdit(null)
+      toast.error("Failed to update configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -204,11 +215,16 @@ const ClusterManagement = () => {
       await clusterFallbackConfigService.delete(configToDelete.id)
       setIsDeleteDialogOpen(false)
       setConfigToDelete(null)
+      toast.success("Configuration deleted successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to delete configuration:", err)
-      setError("Failed to delete configuration. Please try again.")
+      setIsDeleteDialogOpen(false)
+      setConfigToDelete(null)
+      toast.error("Failed to delete configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }

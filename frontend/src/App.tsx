@@ -1,5 +1,7 @@
 import { BrowserRouter } from "react-router-dom"
 import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
+
 import AppRoutes from "./routes"
 
 const App = () => {
@@ -8,6 +10,7 @@ const App = () => {
       <BrowserRouter>
         <AppRoutes />
       </BrowserRouter>
+      <Toaster position="top-center" richColors closeButton />
     </ThemeProvider>
   )
 }
