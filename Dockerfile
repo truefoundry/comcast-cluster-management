@@ -1,5 +1,5 @@
 # Build stage for frontend
-FROM node:18-alpine AS frontend-build
+FROM node:20-alpine AS frontend-build
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
@@ -7,7 +7,7 @@ COPY frontend/ .
 RUN npm run build
 
 # Build stage for backend
-FROM node:18-alpine AS backend-build
+FROM node:20-alpine AS backend-build
 WORKDIR /app/backend
 COPY backend/package*.json ./
 RUN npm install
@@ -15,7 +15,7 @@ COPY backend/ .
 RUN npm run build
 
 # Production stage
-FROM node:18-alpine
+FROM node:20-alpine
 WORKDIR /app
 
 # Copy backend build and node_modules
