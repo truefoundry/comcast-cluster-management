@@ -40,7 +40,8 @@ export class ClusterFallbackConfigController {
     if (authHeader) {
       return authHeader;
     }
-    const fallbackToken = this.appConfigService.get<string>('TF_API_TOKEN');
+    const fallbackToken =
+      this.appConfigService.get<string>('TF_USER_API_TOKEN');
     if (fallbackToken) {
       return `Bearer ${fallbackToken}`;
     }

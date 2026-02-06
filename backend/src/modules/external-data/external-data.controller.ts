@@ -30,7 +30,7 @@ export class ExternalDataController {
     }
 
     // Fallback to environment token for local development
-    const fallbackToken = this.configService.get<string>('TF_API_TOKEN');
+    const fallbackToken = this.configService.get<string>('TF_USER_API_TOKEN');
     if (fallbackToken) {
       return `Bearer ${fallbackToken}`;
     }
