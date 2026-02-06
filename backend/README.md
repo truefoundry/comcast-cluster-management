@@ -110,8 +110,8 @@ TrueFoundry API client providing:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `PORT` | Server port | `3000` |
-| `TRUEFOUNDRY_API_URL` | TrueFoundry API base URL | `https://internal.devtest.truefoundry.tech` |
+| `PORT` | Server port | `8000` |
+| `TRUEFOUNDRY_API_URL` | TrueFoundry API base URL | `https://internal.devtest.truefoundry.tech/api/svc` |
 | `TF_SERVICE_API_TOKEN` | Service account token for API calls | - |
 | `JOB_FALLBACK_ENABLED` | Enable/disable the fallback scheduler | `false` |
 | `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` | Minutes before a job is considered stuck | `60` |
