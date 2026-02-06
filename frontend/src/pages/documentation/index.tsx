@@ -5,6 +5,7 @@ import {
   ConfigurationFields,
   CreatingConfiguration,
   CronJobOverview,
+  DeploymentSetup,
   EnvironmentVariables,
   JobMigrationFlow,
 } from "./components"
@@ -36,6 +37,7 @@ const Documentation = () => {
 
       {/* Technical Sections */}
       <CronJobOverview />
+      <DeploymentSetup />
       <EnvironmentVariables />
       <JobMigrationFlow />
     </div>
