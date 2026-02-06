@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
@@ -13,18 +13,29 @@ export interface Workspace {
   name: string;
   clusterId: string;
   fqn?: string;
+  tenantName?: string;
 }
 
 export interface UserInfo {
   id: string;
   name: string;
   email: string;
+  tenantName?: string;
 }
 
 interface TFPaginatedResponse<T> {
   data: T[];
   pagination: {
     total: number;
+    offset: number;
+    limit: number;
+  };
+}
+
+interface TFJobRunsPaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    hasMore: boolean;
     offset: number;
     limit: number;
   };
@@ -52,15 +63,86 @@ interface TFUserInfo {
   tenantName?: string;
 }
 
+// Job Run types
+export interface JobRun {
+  id: string;
+  name: string;
+  applicationName: string;
+  deploymentVersion: string;
+  createdAt: number;
+  endTime?: number;
+  duration?: number;
+  command?: string;
+  totalRetries: number;
+  error?: string;
+  status: JobRunStatus;
+  triggeredBy?: string;
+  triggeredBySubject?: {
+    subjectId: string;
+    subjectType: string;
+    subjectSlug: string;
+    subjectDisplayName: string;
+  };
+  exitCode?: number;
+  sparkUi?: string;
+  applicationId: string;
+  deploymentId: string;
+  tenantName?: string;
+}
+
+export enum JobRunStatus {
+  CREATED = 'CREATED',
+  SCHEDULED = 'SCHEDULED',
+  RUNNING = 'RUNNING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}
+
+// Deployment types
+export interface Deployment {
+  id: string;
+  applicationId: string;
+  manifest: Record<string, unknown>;
+  version?: string;
+}
+
+// Application creation types
+export interface CreateApplicationRequest {
+  manifest: Record<string, unknown>;
+  dryRun?: boolean;
+  forceDeploy?: boolean;
+  triggerOnDeploy?: boolean;
+}
+
+export interface CreateApplicationResponse {
+  application?: { id: string };
+  deployment: { id: string; applicationId: string };
+}
+
+// Job trigger types
+export interface TriggerJobRequest {
+  applicationId: string;
+  input?: Record<string, unknown>;
+}
+
 /**
  * External Data Service
  *
  * Fetches clusters and workspaces from TrueFoundry API.
  */
+// Constants for TrueFoundry API
+const TFY_ASSUME_USER_HEADER = 'x-tfy-assume-user';
+const SFY_SUBJECT_TYPE = 'serviceaccount';
+const TFY_CONTROLLER_NAME = 'tfy-system';
+
 @Injectable()
 export class ExternalDataService {
+  private readonly logger = new Logger(ExternalDataService.name);
   private readonly baseUrl: string;
   private readonly httpClient: AxiosInstance;
+  /** Assumed user for service account authorization */
+  private readonly assumedUser: string;
 
   constructor(private readonly configService: ConfigService) {
     this.baseUrl = this.configService.get<string>(
@@ -68,10 +150,24 @@ export class ExternalDataService {
       'https://internal.devtest.truefoundry.tech',
     );
 
+    // Get the assumed user from config (for x-tfy-assume-user header)
+    this.assumedUser = this.configService.get<string>(
+      'SFY_ASSUMED_USER',
+      'truefoundry',
+    );
+
     this.httpClient = axios.create({
       baseURL: this.baseUrl,
       timeout: 30000,
     });
+  }
+
+  /**
+   * Build the x-tfy-assume-user header value
+   * Format: serviceaccount/{tenantName}/{assumedUser}/{controllerName}
+   */
+  private buildAssumeUserHeader(tenantName: string): string {
+    return `${SFY_SUBJECT_TYPE}/${tenantName}/${this.assumedUser}/${TFY_CONTROLLER_NAME}`;
   }
 
   /**
@@ -88,7 +184,7 @@ export class ExternalDataService {
     try {
       const response = await this.httpClient.get<
         TFPaginatedResponse<TFCluster>
-      >('/api/svc/v1/clusters', {
+      >('/v1/clusters', {
         headers: { Authorization: authToken },
         params: { limit, offset },
       });
@@ -112,7 +208,7 @@ export class ExternalDataService {
   async getClusterById(authToken: string, clusterId: string): Promise<Cluster> {
     try {
       const response = await this.httpClient.get<TFCluster>(
-        `/api/svc/v1/clusters/${clusterId}`,
+        `/v1/clusters/${clusterId}`,
         {
           headers: { Authorization: authToken },
         },
@@ -145,7 +241,7 @@ export class ExternalDataService {
     try {
       const response = await this.httpClient.get<
         TFPaginatedResponse<TFWorkspace>
-      >('/api/svc/v1/workspaces', {
+      >('/v1/workspaces', {
         headers: { Authorization: authToken },
         params: {
           limit: options?.limit ?? 100,
@@ -160,6 +256,7 @@ export class ExternalDataService {
           name: workspace.name,
           clusterId: workspace.clusterId,
           fqn: workspace.fqn,
+          tenantName: workspace.tenantName,
         })),
         pagination: response.data.pagination,
       };
@@ -177,7 +274,7 @@ export class ExternalDataService {
   ): Promise<Workspace> {
     try {
       const response = await this.httpClient.get<TFWorkspace>(
-        `/api/svc/v1/workspaces/${workspaceId}`,
+        `/v1/workspaces/${workspaceId}`,
         {
           headers: { Authorization: authToken },
         },
@@ -188,6 +285,7 @@ export class ExternalDataService {
         name: response.data.name,
         clusterId: response.data.clusterId,
         fqn: response.data.fqn,
+        tenantName: response.data.tenantName,
       };
     } catch (error) {
       this.handleError(error, `Failed to fetch workspace ${workspaceId}`);
@@ -199,20 +297,196 @@ export class ExternalDataService {
    */
   async getUserInfo(authToken: string): Promise<UserInfo> {
     try {
-      const response = await this.httpClient.get<TFUserInfo>(
-        '/api/svc/v1/users/info',
-        {
-          headers: { Authorization: authToken },
-        },
-      );
+      const response = await this.httpClient.get<TFUserInfo>('/v1/users/info', {
+        headers: { Authorization: authToken },
+      });
 
       return {
         id: response.data.id,
         name: response.data.name,
         email: response.data.email,
+        tenantName: response.data.tenantName,
       };
     } catch (error) {
       this.handleError(error, 'Failed to fetch user info');
+    }
+  }
+
+  /**
+   * Get job runs by cluster and workspace from TrueFoundry Internal API
+   * Supports multiple statuses via repeated query params (status=X&status=Y)
+   */
+  async getJobRunsByClusterAndWorkspace(
+    authToken: string,
+    clusterId: string,
+    workspaceId: string,
+    options?: {
+      status?: JobRunStatus | JobRunStatus[];
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<{
+    data: JobRun[];
+    pagination: { hasMore: boolean; offset: number; limit: number };
+  }> {
+    try {
+      const response = await this.httpClient.get<
+        TFJobRunsPaginatedResponse<JobRun>
+      >('/v1/x/job-runs', {
+        headers: { Authorization: authToken },
+        params: {
+          clusterId,
+          workspaceId,
+          status: options?.status,
+          limit: options?.limit ?? 100,
+          offset: options?.offset ?? 0,
+        },
+      });
+
+      return {
+        data: response.data.data,
+        pagination: response.data.pagination,
+      };
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to fetch job runs for cluster ${clusterId} and workspace ${workspaceId}`,
+      );
+    }
+  }
+
+  /**
+   * Get deployment by application ID and version from TrueFoundry
+   * @param tenantName - Tenant name for authorization header
+   */
+  async getDeployment(
+    authToken: string,
+    applicationId: string,
+    deploymentVersion: string | undefined,
+    tenantName: string,
+  ): Promise<Deployment> {
+    try {
+      const params: Record<string, string> = {};
+      if (deploymentVersion) {
+        params.version = deploymentVersion;
+      }
+
+      const response = await this.httpClient.get<
+        TFPaginatedResponse<Deployment>
+      >(`/v1/apps/${applicationId}/deployments`, {
+        headers: {
+          Authorization: authToken,
+          [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+        },
+        params,
+      });
+
+      // API returns paginated response, get the first deployment
+      if (!response.data.data || response.data.data.length === 0) {
+        throw new HttpException(
+          `No deployment found for application ${applicationId}`,
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return response.data.data[0];
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to fetch deployment for application ${applicationId}`,
+      );
+    }
+  }
+
+  /**
+   * Create an application on TrueFoundry
+   * @param tenantName - Tenant name for authorization header
+   */
+  async createApplication(
+    authToken: string,
+    request: CreateApplicationRequest,
+    tenantName: string,
+  ): Promise<CreateApplicationResponse> {
+    try {
+      const response = await this.httpClient.post<CreateApplicationResponse>(
+        '/v1/apps',
+        request,
+        {
+          headers: {
+            Authorization: authToken,
+            [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'Failed to create application');
+    }
+  }
+
+  /**
+   * Trigger a job on TrueFoundry
+   * @param tenantName - Tenant name for authorization header
+   */
+  async triggerJob(
+    authToken: string,
+    request: TriggerJobRequest,
+    tenantName: string,
+  ): Promise<{ jobRunId: string }> {
+    try {
+      const response = await this.httpClient.post<{ jobRunId: string }>(
+        '/v1/jobs/trigger',
+        {
+          applicationId: request.applicationId,
+          params: request.input,
+        },
+        {
+          headers: {
+            Authorization: authToken,
+            [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to trigger job for application ${request.applicationId}`,
+      );
+    }
+  }
+
+  /**
+   * Terminate a job run on TrueFoundry
+   * Uses /api/svc/v1/jobs/terminate with deploymentId and jobRunName as query params
+   * @param deploymentId - Deployment ID (from getDeployment response.data.data[0].id)
+   * @param jobRunName - Job run name
+   * @param tenantName - Tenant name for authorization header
+   */
+  async terminateJobRun(
+    authToken: string,
+    deploymentId: string,
+    jobRunName: string,
+    tenantName: string,
+  ): Promise<void> {
+    try {
+      await this.httpClient.post('/v1/jobs/terminate', null, {
+        headers: {
+          Authorization: authToken,
+          [TFY_ASSUME_USER_HEADER]: this.buildAssumeUserHeader(tenantName),
+        },
+        params: {
+          deploymentId,
+          jobRunName,
+        },
+      });
+    } catch (error) {
+      this.handleError(
+        error,
+        `Failed to terminate job run ${jobRunName} (deployment: ${deploymentId})`,
+      );
     }
   }
 

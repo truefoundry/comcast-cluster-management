@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 // import { ConfigService } from '@nestjs/config'; // Uncomment when using TypeORM
+import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
 // import { TypeOrmModule } from '@nestjs/typeorm';
 import { join } from 'path';
@@ -16,6 +17,7 @@ import { ClusterFallbackConfigModule } from './modules/cluster-fallback-config';
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
       exclude: ['/api/(.*)'], // Exclude API routes from static serving

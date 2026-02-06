@@ -16,6 +16,7 @@ export interface Workspace {
 export interface ClusterInfo {
   clusterId: string
   workspaceId: string
+  workspaceFqn?: string
 }
 
 export interface SourceClusterInfo extends ClusterInfo {
@@ -41,6 +42,7 @@ export interface CreateClusterFallbackConfigPayload {
   destination: {
     clusterId: string
     workspaceId: string
+    workspaceFqn?: string
   }
 }
 
@@ -53,5 +55,6 @@ export interface UpdateClusterFallbackConfigPayload {
   destination?: {
     clusterId: string
     workspaceId: string
+    workspaceFqn?: string
   }
 }

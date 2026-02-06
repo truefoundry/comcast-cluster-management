@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react"
+import { toast } from "sonner"
 import { Searchbar } from "@/components/ui/searchbar"
 import { Spin } from "@/components/ui/spin"
 import {
@@ -13,6 +14,7 @@ import {
   clusterFallbackConfigService,
   externalDataService,
 } from "@/lib/services"
+import { getErrorMessage } from "@/lib/utils"
 
 const initialFormData: ConfigurationFormData = {
   sourceCluster: "",
@@ -74,7 +76,20 @@ const ClusterManagement = () => {
     fetchData()
   }, [fetchData])
 
-  // Filter data based on search query across all columns
+  // Create lookup maps for names (for search)
+  const clusterNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    clusters.forEach((c) => map.set(c.id, c.name))
+    return map
+  }, [clusters])
+
+  const workspaceNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    workspaces.forEach((w) => map.set(w.id, w.name))
+    return map
+  }, [workspaces])
+
+  // Filter data based on search query across all columns (IDs and names)
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) {
       return configurations
@@ -89,13 +104,18 @@ const ClusterManagement = () => {
         config.source.jobId ?? "",
         config.destination.clusterId,
         config.destination.workspaceId,
+        // Also search by names
+        clusterNameMap.get(config.source.clusterId) ?? "",
+        workspaceNameMap.get(config.source.workspaceId) ?? "",
+        clusterNameMap.get(config.destination.clusterId) ?? "",
+        workspaceNameMap.get(config.destination.workspaceId) ?? "",
       ]
 
       return searchableFields.some((field) =>
         field.toLowerCase().includes(query)
       )
     })
-  }, [searchQuery, configurations])
+  }, [searchQuery, configurations, clusterNameMap, workspaceNameMap])
 
   const handleCreateSubmit = async () => {
     setIsSubmitting(true)
@@ -113,15 +133,20 @@ const ClusterManagement = () => {
         destination: {
           clusterId: destWorkspace?.clusterId ?? createFormData.destinationCluster,
           workspaceId: createFormData.destinationWorkspace,
+          workspaceFqn: destWorkspace?.fqn,
         },
       })
       setCreateFormData(initialFormData)
       setIsCreateDrawerOpen(false)
+      toast.success("Configuration created successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to create configuration:", err)
-      setError("Failed to create configuration. Please try again.")
+      setIsCreateDrawerOpen(false)
+      toast.error("Failed to create configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -145,15 +170,21 @@ const ClusterManagement = () => {
         destination: {
           clusterId: destWorkspace?.clusterId ?? editFormData.destinationCluster,
           workspaceId: editFormData.destinationWorkspace,
+          workspaceFqn: destWorkspace?.fqn,
         },
       })
       setIsEditDrawerOpen(false)
       setConfigToEdit(null)
+      toast.success("Configuration updated successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to update configuration:", err)
-      setError("Failed to update configuration. Please try again.")
+      setIsEditDrawerOpen(false)
+      setConfigToEdit(null)
+      toast.error("Failed to update configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -184,11 +215,16 @@ const ClusterManagement = () => {
       await clusterFallbackConfigService.delete(configToDelete.id)
       setIsDeleteDialogOpen(false)
       setConfigToDelete(null)
+      toast.success("Configuration deleted successfully")
       // Refresh data
       await fetchData()
     } catch (err) {
       console.error("Failed to delete configuration:", err)
-      setError("Failed to delete configuration. Please try again.")
+      setIsDeleteDialogOpen(false)
+      setConfigToDelete(null)
+      toast.error("Failed to delete configuration", {
+        description: getErrorMessage(err),
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -256,6 +292,8 @@ const ClusterManagement = () => {
 
       <ClusterListTable
         data={filteredData}
+        clusters={clusters}
+        workspaces={workspaces}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
       />

@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
-import {  Server } from "lucide-react";
+import { Server, BookOpen } from "lucide-react";
 
 interface SidebarProps {
   className?: string;
@@ -8,6 +8,7 @@ interface SidebarProps {
 
 const navigation = [
   { name: "Cluster Management", href: "/", icon: Server },
+  { name: "Documentation", href: "/docs", icon: BookOpen },
 ];
 
 export const Sidebar = ({ className }: SidebarProps) => {

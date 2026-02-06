@@ -1,4 +1,5 @@
 import { ArrowRight } from "lucide-react"
+import { useMemo } from "react"
 import {
   Select,
   SelectContent,
@@ -33,8 +34,37 @@ const ConfigurationForm = ({
   clusters,
   workspaces,
 }: ConfigurationFormProps) => {
+  // Filter workspaces based on selected cluster
+  const sourceWorkspaces = useMemo(() => {
+    if (!formData.sourceCluster) return []
+    return workspaces.filter((w) => w.clusterId === formData.sourceCluster)
+  }, [workspaces, formData.sourceCluster])
+
+  const destinationWorkspaces = useMemo(() => {
+    if (!formData.destinationCluster) return []
+    return workspaces.filter((w) => w.clusterId === formData.destinationCluster)
+  }, [workspaces, formData.destinationCluster])
+
   const updateField = (field: keyof ConfigurationFormData, value: string) => {
-    onFormChange({ ...formData, [field]: value })
+    const newData = { ...formData, [field]: value }
+
+    // When source cluster changes, clear source workspace if it doesn't belong to the new cluster
+    if (field === "sourceCluster") {
+      const currentWorkspace = workspaces.find((w) => w.id === formData.sourceWorkspace)
+      if (currentWorkspace && currentWorkspace.clusterId !== value) {
+        newData.sourceWorkspace = ""
+      }
+    }
+
+    // When destination cluster changes, clear destination workspace if it doesn't belong to the new cluster
+    if (field === "destinationCluster") {
+      const currentWorkspace = workspaces.find((w) => w.id === formData.destinationWorkspace)
+      if (currentWorkspace && currentWorkspace.clusterId !== value) {
+        newData.destinationWorkspace = ""
+      }
+    }
+
+    onFormChange(newData)
   }
 
   return (
@@ -69,12 +99,13 @@ const ConfigurationForm = ({
           <Select
             value={formData.sourceWorkspace}
             onValueChange={(value) => updateField("sourceWorkspace", value)}
+            disabled={!formData.sourceCluster}
           >
             <SelectTrigger id={`${idPrefix}-source-workspace`}>
-              <SelectValue placeholder="Select source workspace" />
+              <SelectValue placeholder={formData.sourceCluster ? "Select source workspace" : "Select a cluster first"} />
             </SelectTrigger>
             <SelectContent>
-              {workspaces.map((workspace) => (
+              {sourceWorkspaces.map((workspace) => (
                 <SelectItem key={workspace.id} value={workspace.id}>
                   {workspace.name}
                 </SelectItem>
@@ -130,12 +161,13 @@ const ConfigurationForm = ({
           <Select
             value={formData.destinationWorkspace}
             onValueChange={(value) => updateField("destinationWorkspace", value)}
+            disabled={!formData.destinationCluster}
           >
             <SelectTrigger id={`${idPrefix}-destination-workspace`}>
-              <SelectValue placeholder="Select fallback workspace" />
+              <SelectValue placeholder={formData.destinationCluster ? "Select fallback workspace" : "Select a cluster first"} />
             </SelectTrigger>
             <SelectContent>
-              {workspaces.map((workspace) => (
+              {destinationWorkspaces.map((workspace) => (
                 <SelectItem key={workspace.id} value={workspace.id}>
                   {workspace.name}
                 </SelectItem>
