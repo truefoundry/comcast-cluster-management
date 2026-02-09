@@ -1,0 +1,90 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "spark-job-fallback-management.fullname" . }}
+  labels:
+    {{- include "spark-job-fallback-management.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "spark-job-fallback-management.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "spark-job-fallback-management.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8000"
+            - name: DATA_DIR
+              value: "/app/data"
+            - name: NODE_ENV
+              value: "production"
+            - name: SFY_ASSUMED_USER
+              value: {{ .Values.truefoundryApi.assumedUser | quote }}
+            - name: TRUEFOUNDRY_API_URL
+              value: {{ .Values.truefoundryApi.url | quote }}
+            {{- if .Values.truefoundryApi.serviceApiToken }}
+            - name: TF_SERVICE_API_TOKEN
+              value: {{ .Values.truefoundryApi.serviceApiToken | quote }}
+            {{- end }}
+            - name: JOB_FALLBACK_ENABLED
+              value: {{ .Values.jobFallback.enabled | quote }}
+            - name: JOB_FALLBACK_TRIGGER_DELAY_MS
+              value: {{ .Values.jobFallback.triggerDelayMs | quote }}
+            - name: JOB_FALLBACK_TRIGGER_MAX_RETRIES
+              value: {{ .Values.jobFallback.triggerMaxRetries | quote }}
+            - name: JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS
+              value: {{ .Values.jobFallback.triggerRetryDelayMs | quote }}
+            - name: JOB_FALLBACK_STUCK_THRESHOLD_MINUTES
+              value: {{ .Values.jobFallback.stuckThresholdMinutes | quote }}
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "spark-job-fallback-management.fullname" . }}-data
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

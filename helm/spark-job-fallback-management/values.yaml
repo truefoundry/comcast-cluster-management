@@ -1,0 +1,112 @@
+# Default values for spark-job-fallback-management
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Number of pod replicas
+replicaCount: 1
+
+# Container image configuration
+image:
+  # Repository should be set when deploying (e.g., your Docker registry)
+  repository: ""
+  # Image pull policy
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion
+  tag: "latest"
+
+# Image pull secrets for private registries
+imagePullSecrets: []
+
+# Override the name of the chart
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use
+  name: ""
+
+# Pod annotations
+podAnnotations: {}
+
+# Pod security context
+podSecurityContext:
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 8000
+
+# Resource requests and limits
+# These match the current TrueFoundry deployment settings
+resources:
+  requests:
+    cpu: 500m
+    memory: 1000Mi
+  limits:
+    cpu: 500m
+    memory: 1000Mi
+
+# Persistent storage (auto-created by Helm)
+persistence:
+  # Storage size for /app/data
+  size: 1Gi
+  # Storage class (leave empty for cluster default)
+  storageClass: ""
+
+# TrueFoundry API Configuration
+truefoundryApi:
+  url: "https://internal.devtest.truefoundry.tech/api/svc"
+  assumedUser: "truefoundry"
+  # Service API token - set via TrueFoundry secrets or override
+  serviceApiToken: ""
+
+# Job Fallback Scheduler Configuration
+jobFallback:
+  enabled: true
+  triggerDelayMs: 15000
+  triggerMaxRetries: 3
+  triggerRetryDelayMs: 15000
+  stuckThresholdMinutes: 60
+
+# Additional custom environment variables
+env: {}
+
+# Node selector for pod scheduling
+nodeSelector: {}
+
+# Tolerations for pod scheduling
+tolerations: []
+
+# Affinity rules for pod scheduling
+affinity: {}
+
+# Liveness probe configuration
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe configuration
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
