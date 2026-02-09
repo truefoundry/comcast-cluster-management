@@ -1,98 +1,182 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Cluster Fallback Management Backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+A NestJS backend service for managing cluster fallback configurations and automatically moving stuck jobs between TrueFoundry clusters/workspaces.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Features
 
-## Description
+- **Cluster Fallback Configuration Management** - Create, read, update, and delete fallback rules that define how stuck jobs should be migrated
+- **Automatic Job Fallback** - Scheduled cron job that detects stuck jobs and automatically moves them to destination clusters
+- **TrueFoundry API Integration** - Proxy endpoints for fetching clusters, workspaces, and job information
+- **Priority-based Matching** - Job-specific configurations take priority over generic workspace-level configurations
+- **Retry Logic** - Built-in retry mechanism for handling transient API failures
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## Folder Structure
 
-## Project setup
-
-```bash
-$ npm install
+```
+backend/
+├── src/
+│   ├── main.ts                    # Application entry point
+│   ├── app.module.ts              # Root module with global configuration
+│   ├── app.controller.ts          # Health check endpoint
+│   ├── app.service.ts             # Basic app service
+│   ├── data-source.ts             # TypeORM data source configuration
+│   │
+│   ├── entities/                  # Database entities
+│   │   ├── index.ts
+│   │   └── cluster-fallback-config.entity.ts  # Fallback config entity
+│   │
+│   ├── lib/                       # Shared utilities
+│   │   ├── json-storage.ts        # JSON file-based storage (alternative to DB)
+│   │   └── retry.ts               # Generic retry utility with configurable options
+│   │
+│   ├── migrations/                # TypeORM migrations
+│   │   ├── 1736927400000-InitialSchema.ts
+│   │   ├── 1736928000000-RemoveUserTables.ts
+│   │   └── 1736928500000-AddCreatedByColumn.ts
+│   │
+│   └── modules/
+│       ├── cluster-fallback-config/           # Fallback configuration module
+│       │   ├── cluster-fallback-config.module.ts
+│       │   ├── cluster-fallback-config.controller.ts  # CRUD API endpoints
+│       │   ├── cluster-fallback-config.service.ts     # Business logic for configs
+│       │   ├── job-fallback-scheduler.service.ts      # Cron job for auto-fallback
+│       │   ├── fallback-test.controller.ts            # Test endpoints for debugging
+│       │   ├── dto/
+│       │   │   ├── create-cluster-fallback-config.dto.ts
+│       │   │   └── update-cluster-fallback-config.dto.ts
+│       │   └── index.ts
+│       │
+│       └── external-data/                     # TrueFoundry API integration
+│           ├── external-data.module.ts
+│           ├── external-data.controller.ts    # Proxy endpoints for TF API
+│           ├── external-data.service.ts       # TrueFoundry API client
+│           └── index.ts
+│
+├── package.json
+├── tsconfig.json
+└── nest-cli.json
 ```
 
-## Compile and run the project
+## Main Business Logic
 
-```bash
-# development
-$ npm run start
+### 1. Fallback Configuration (`cluster-fallback-config.service.ts`)
 
-# watch mode
-$ npm run start:dev
+Manages fallback rules that define:
+- **Source**: Cluster + Workspace (+ optional specific Job ID)
+- **Destination**: Cluster + Workspace where stuck jobs should be migrated
 
-# production mode
-$ npm run start:prod
+**Key Features:**
+- Duplicate prevention: Only one generic config per source cluster/workspace
+- Job-specific configs: Higher priority than generic configs
+- Validation: Ensures source and destination are different
+
+### 2. Job Fallback Scheduler (`job-fallback-scheduler.service.ts`)
+
+Automated cron job that runs periodically to:
+
+1. **Fetch all fallback configurations** from storage
+2. **Group configs by source** (cluster + workspace)
+3. **For each source**, fetch job runs with `CREATED` and `SCHEDULED` status
+4. **Filter stuck jobs** - Jobs running longer than threshold (default: 60 minutes)
+5. **Match jobs to configs** - Job-specific first, then generic
+6. **Move stuck jobs** to destination:
+   - Get deployment manifest from source
+   - Create new application in destination workspace
+   - Trigger the job with original input
+   - Terminate the stuck job on source
+
+**Configuration Matching Priority:**
+```
+Job Y stuck on Cluster A, Workspace B
+  ↓
+1. Check: Is there a config for (Cluster A, Workspace B, Job Y)? → Use it
+2. Check: Is there a config for (Cluster A, Workspace B, *)? → Use it
+3. No config found → Skip this job
 ```
 
-## Run tests
+### 3. External Data Service (`external-data.service.ts`)
+
+TrueFoundry API client providing:
+- `getClusters()` / `getClusterById()` - Fetch cluster information
+- `getWorkspaces()` / `getWorkspaceById()` - Fetch workspace information
+- `getUserInfo()` - Get current user details
+- `getJobRunsByClusterAndWorkspace()` - Fetch job runs with pagination
+- `getDeployment()` - Get deployment manifest
+- `createApplication()` - Create new application
+- `triggerJob()` - Trigger a job run
+- `terminateJobRun()` - Terminate a running job
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PORT` | Server port | `8000` |
+| `TRUEFOUNDRY_API_URL` | TrueFoundry API base URL | `https://internal.devtest.truefoundry.tech/api/svc` |
+| `TF_SERVICE_API_TOKEN` | Service account token for API calls | - |
+| `JOB_FALLBACK_ENABLED` | Enable/disable the fallback scheduler | `false` |
+| `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` | Minutes before a job is considered stuck | `60` |
+| `JOB_FALLBACK_TRIGGER_MAX_RETRIES` | Max retries for job trigger/terminate | `3` |
+| `JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS` | Delay between retries | `3000` |
+| `JOB_FALLBACK_TRIGGER_DELAY_MS` | Wait time before triggering job | `5000` |
+| `DATA_DIR` | Directory for JSON file storage | `/app/data` |
+
+## API Endpoints
+
+### Fallback Configurations
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/fallback-configs` | List all configurations |
+| `GET` | `/api/fallback-configs/:id` | Get configuration by ID |
+| `POST` | `/api/fallback-configs` | Create new configuration |
+| `PATCH` | `/api/fallback-configs/:id` | Update configuration |
+| `DELETE` | `/api/fallback-configs/:id` | Delete configuration |
+
+### External Data (Proxy to TrueFoundry)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/external/clusters` | List all clusters |
+| `GET` | `/api/external/workspaces` | List all workspaces |
+| `GET` | `/api/external/workspaces?clusterId=X` | List workspaces by cluster |
+
+## Development
+
+### Setup
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Run in Development
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Run in Production
 
-## Resources
+```bash
+npm run build
+npm run start:prod
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### Database Migrations (when using PostgreSQL)
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+# Generate a new migration
+npm run migration:generate --name=MigrationName
 
-## Support
+# Run migrations
+npm run migration:run
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+# Revert last migration
+npm run migration:revert
+```
 
-## Stay in touch
+## Architecture Notes
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- **Storage**: Currently uses JSON file storage (`lib/json-storage.ts`). PostgreSQL/TypeORM is configured but commented out in `app.module.ts` — added for future scaling when higher throughput or data persistence is required.
+- **Authentication**: Uses TrueFoundry tokens passed via `Authorization` header. Service account operations use `x-tfy-assume-user` header.
+- **Scheduling**: Uses `@nestjs/schedule` with cron expressions. Default interval is every five minute.
+- **Error Handling**: Comprehensive error handling with appropriate HTTP status codes and logging.
