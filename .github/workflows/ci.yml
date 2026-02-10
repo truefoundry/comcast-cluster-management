@@ -24,9 +24,8 @@ jobs:
       # Using JFrog only (no ECR)
       enable_jfrog: true
       enable_public_ecr: false
-      # ecr_repository_url: public.ecr.aws/truefoundrycloud
       artifactory_registry_url: tfy.jfrog.io
-      artifactory_repository_url: tfy.jfrog.io/tfy-images
+      artifactory_repository_url: tfy.jfrog.io/tfy-private-images
       dockerfile_path: Dockerfile
       image_context: '.'
       platforms: 'linux/amd64'
