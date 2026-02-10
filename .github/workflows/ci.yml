@@ -23,7 +23,7 @@ jobs:
       extra_image_tag: ${{ github.ref_name }}
       enable_jfrog: false
       enable_public_ecr: true
-      ecr_repository_url : 526077812922.dkr.ecr.us-east-1.amazonaws.com
+      ecr_repository_url : 526077812922.dkr.ecr.us-east-1.amazonaws.com/sparkjob-fallback-management
       artifactory_registry_url: tfy.jfrog.io
       artifactory_repository_url: tfy.jfrog.io/sparkjob-fallback-management
       dockerfile_path: Dockerfile
