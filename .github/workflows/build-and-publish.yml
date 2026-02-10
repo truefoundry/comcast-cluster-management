@@ -1,36 +1,284 @@
-name: Build and Publish Cluster Management
+# Workflow name
+name: Build and push container images to Artifactory
 
+# Trigger on workflow_call
 on:
-  release:
-    types: [published]
-  workflow_dispatch:  # Manual trigger
-  push:
-    branches:
-      - 'feat/fallback-helm-*'
-      - 'main'
-
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-  id-token: write
-
-jobs:
-  build_container:
-    name: Build and Push Docker Image
-    uses: truefoundry/workflows/.github/workflows/build.yml@main
-    with:
-      image_tag: ${{ github.sha }}
-      enable_ecr_auth: true
-      extra_image_tag: ${{ github.ref_name }}
-      depot_project_id: ${{ vars.DEPOT_PROJECT_ID }}
-      image_artifact_name: ${{ github.event.repository.name }}
-      artifactory_registry_url: ${{ vars.TRUEFOUNDRY_ARTIFACTORY_REGISTRY_URL }}
-      artifactory_repository_url: ${{ vars.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_REPOSITORY }}
+  workflow_call:
+    inputs:
+      artifactory_registry_url:
+        description: 'Registry URL for JFrog Artifactory e.g tfy.jfrog.io'
+        required: false
+        type: string
+      artifactory_repository_url:
+        description: 'Repository url for JFrog Artifactory e.g tfy.jfrog.io/tfy-images'
+        required: false
+        type: string
+      image_artifact_name:
+        description: 'Name of the image artifact, usually the repository name e.g mlfoundry-server'
+        required: true
+        type: string
+      image_tag:
+        description: 'Image tag for the image to be pushed'
+        required: true
+        type: string
+      extra_image_tag:
+        description: 'Extra image tags for the image to be pushed (array)'
+        required: false
+        type: string
+      image_context:
+        description: 'Context for the image to be built'
+        required: false
+        type: string
+        default: '.'
+      platforms:
+        description: 'Platforms for the image to be built'
+        required: false
+        type: string
+        default: 'linux/amd64,linux/arm64'
+      enable_scan:
+        description: 'Enable image scanning'
+        required: false
+        type: boolean
+        default: false
+      enable_public_ecr:
+        description: 'Enable push to ECR'
+        required: false
+        type: boolean
+        default: false
+      ecr_repository_url:
+        description: 'Repository URL for AWS Public ECR e.g public.ecr.aws/your-alias/your-repo'
+        required: false
+        type: string
+      enable_jfrog:
+        description: 'Enable push to JFROG'
+        required: false
+        type: boolean
+        default: true
+      aws_ecr_region:
+        description: 'AWS Public ECR region'
+        required: false
+        type: string
+        default: 'us-east-1'
+      image_scan_severity_cutoff:
+        description: 'Severity cutoff for image scanning'
+        required: false
+        type: string
+        default: 'high'
+      dockerfile_path:
+        description: 'Dockerfile for the image to be built'
+        required: false
+        type: string
+        default: 'Dockerfile'
+      image_build_args:
+        description: 'Build arguments for the image to be built'
+        required: false
+        type: string
+      free_disk_space:
+        description: 'Free disk space on the runner'
+        required: false
+        type: boolean
+        default: false
+      free_disk_space_docker_images:
+        description: 'Free disk space for Docker images'
+        required: false
+        type: boolean
+        default: false
+      free_disk_space_tool_cache_storage:
+        description: 'Free disk space for tool cache storage'
+        required: false
+        type: boolean
+        default: false
+      free_disk_space_large_packages:
+        description: 'Free disk space for large packages'
+        required: false
+        type: boolean
+        default: false
+      enable_provenance:
+        description: 'Enable provenance attestation for supply chain security'
+        required: false
+        type: boolean
+        default: false
     secrets:
-      depot_token: ${{ secrets.DEPOT_API_KEY }}
-      artifactory_username: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_USERNAME }}
-      artifactory_password: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_PASSWORD }}
-      ecr_iam_role_arn: ${{ secrets.AWS_DEVTEST_ECR_IAM_ROLE_ARN }}
+      artifactory_username:
+        description: 'Username for JFrog Artifactory. Required if enable_jfrog is true'
+        required: false
+      artifactory_password:
+        description: 'Password for JFrog Artifactory. Required if enable_jfrog is true'
+        required: false
+      ecr_role_arn:
+        description: 'Role ARN required to pull and push images to public ecr. Required if enable_public_ecr is true'
+        required: false
+
+# Jobs
+jobs:
+  build:
+    name: Build and Push Image to Repository
+    runs-on: ubuntu-latest
+    env:
+      JFROG_IMAGE_URL: ${{ inputs.artifactory_repository_url }}/${{ inputs.image_artifact_name }}
+      ECR_IMAGE_URL: ${{ inputs.ecr_repository_url }}/${{ inputs.image_artifact_name }}
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        if: ${{ inputs.free_disk_space }}
+        uses: jlumbroso/free-disk-space@main
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: ${{ inputs.free_disk_space_large_packages }}
+          docker-images: ${{ inputs.free_disk_space_docker_images }}
+          tool-cache: ${{ inputs.free_disk_space_tool_cache_storage }}
+          swap-storage: false
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate registry configuration
+        run: |
+          if [ "${{ inputs.enable_jfrog }}" != "true" ] && [ "${{ inputs.enable_public_ecr }}" != "true" ]; then
+            echo "Error: At least one registry must be enabled (enable_jfrog or enable_public_ecr)"
+            exit 1
+          fi
+
+          if [ "${{ inputs.enable_jfrog }}" == "true" ]; then
+            if [ -z "${{ inputs.artifactory_registry_url }}" ] || [ -z "${{ inputs.artifactory_repository_url }}" ]; then
+              echo "Error: artifactory_registry_url and artifactory_repository_url are required when enable_jfrog is true"
+              exit 1
+            fi
+          fi
+
+          if [ "${{ inputs.enable_public_ecr }}" == "true" ]; then
+            if [ -z "${{ inputs.ecr_repository_url }}" ]; then
+              echo "Error: ecr_repository_url is required when enable_public_ecr is true"
+              exit 1
+            fi
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to JFrog Artifactory
+        uses: docker/login-action@v3
+        if: ${{ inputs.enable_jfrog }}
+        with:
+          username: ${{ secrets.artifactory_username }}
+          password: ${{ secrets.artifactory_password }}
+          registry: ${{ inputs.artifactory_registry_url }}
+
+      - name: configure aws credentials
+        if: ${{ inputs.enable_public_ecr }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.ecr_role_arn }}
+          aws-region: ${{ inputs.aws_ecr_region }}
+
+      - name: Login to AWS Public ECR
+        if: ${{ inputs.enable_public_ecr }}
+        run: |
+          aws ecr-public get-login-password --region ${{ inputs.aws_ecr_region }} | docker login --username AWS --password-stdin public.ecr.aws
+
+      - name: Build image for scanning
+        uses: docker/build-push-action@v6
+        if: ${{ inputs.enable_scan }}
+        with:
+          push: false
+          load: true
+          file: ${{ inputs.dockerfile_path }}
+          context: ${{ inputs.image_context }}
+          platforms: linux/amd64 # arm intentionally excluded since we can do with just amd for scan image action
+          tags: |
+            ${{ inputs.image_artifact_name }}:${{ inputs.image_tag }}-scan
+          build-args: ${{ inputs.image_build_args && toJSON(inputs.image_build_args) || '' }}
+
+      - name: Scan image
+        uses: anchore/scan-action@v6
+        if: ${{ inputs.enable_scan }}
+        with:
+          image: ${{ inputs.image_artifact_name }}:${{ inputs.image_tag }}-scan
+          fail-build: true
+          severity-cutoff: ${{ inputs.image_scan_severity_cutoff }}
+          output-format: table
+
+      - name: Prepare image tags
+        id: prepare_tags
+        env:
+          JFROG_IMAGE_URL: ${{ env.JFROG_IMAGE_URL }}
+          ECR_IMAGE_URL: ${{ env.ECR_IMAGE_URL }}
+          ENABLE_JFROG: ${{ inputs.enable_jfrog }}
+          ENABLE_ECR: ${{ inputs.enable_public_ecr }}
+        run: |
+          TAGS=()
+
+          # Add primary tags for enabled registries
+          if [ "$ENABLE_JFROG" == "true" ]; then
+            echo "Adding JFrog tag: $JFROG_IMAGE_URL:${{ inputs.image_tag }}"
+            TAGS+=("$JFROG_IMAGE_URL:${{ inputs.image_tag }}")
+          fi
+
+          if [ "$ENABLE_ECR" == "true" ]; then
+            echo "Adding ECR tag: $ECR_IMAGE_URL:${{ inputs.image_tag }}"
+            TAGS+=("$ECR_IMAGE_URL:${{ inputs.image_tag }}")
+          fi
+
+          # Process extra tags if provided
+          if [ -n "${{ inputs.extra_image_tag }}" ]; then
+            echo "Processing extra image tags: ${{ inputs.extra_image_tag }}"
+            while IFS= read -r tag; do
+              tag="${tag%\"}"
+              tag="${tag#\"}"
+              tag="${tag// /}"
+              
+              if [ -n "$tag" ]; then
+                if [ "$ENABLE_JFROG" == "true" ]; then
+                  echo "Adding extra JFrog tag: $JFROG_IMAGE_URL:$tag"
+                  TAGS+=("$JFROG_IMAGE_URL:$tag")
+                fi
+                if [ "$ENABLE_ECR" == "true" ]; then
+                  echo "Adding extra ECR tag: $ECR_IMAGE_URL:$tag"
+                  TAGS+=("$ECR_IMAGE_URL:$tag")
+                fi
+              fi
+            done <<< "${{ inputs.extra_image_tag }}"
+          fi
+
+          echo "All tags to be pushed:"
+          printf '%s\n' "${TAGS[@]}"
+
+          # Save to GitHub environment
+          {
+            echo "all_tags<<EOF"
+            printf '%s\n' "${TAGS[@]}"
+            echo "EOF"
+          } >> $GITHUB_ENV
+
+      - name: Set cache registry
+        id: cache_registry
+        run: |
+          if [ "${{ inputs.enable_jfrog }}" == "true" ]; then
+            echo "cache_ref=${{ env.JFROG_IMAGE_URL }}:buildcache" >> $GITHUB_OUTPUT
+            echo "Using JFrog for build cache"
+          else
+            echo "cache_ref=${{ env.ECR_IMAGE_URL }}:buildcache" >> $GITHUB_OUTPUT
+            echo "Using ECR for build cache"
+          fi
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          provenance: ${{ inputs.enable_provenance }}
+          file: ${{ inputs.dockerfile_path }}
+          context: ${{ inputs.image_context }}
+          platforms: ${{ inputs.platforms }}
+          tags: ${{ env.all_tags }}
+          cache-from: type=registry,ref=${{ steps.cache_registry.outputs.cache_ref }}
+          cache-to: mode=max,image-manifest=true,compression=zstd,type=registry,ref=${{ steps.cache_registry.outputs.cache_ref }}
+          build-args: ${{ inputs.image_build_args && toJSON(inputs.image_build_args) || '' }}
+
+      - name: Output image digest
+        run: |
+          echo "Image digest: ${{ steps.build.outputs.digest }}"
