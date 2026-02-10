@@ -21,8 +21,8 @@ jobs:
       image_artifact_name: spark-job-fallback-management
       image_tag: ${{ github.sha }}
       extra_image_tag: ${{ github.ref_name }}
-      enable_jfrog: true
-      enable_public_ecr: false
+      enable_jfrog: false
+      enable_public_ecr: true
       artifactory_registry_url: tfy.jfrog.io
       artifactory_repository_url: tfy.jfrog.io/sparkjob-fallback-management
       dockerfile_path: Dockerfile
