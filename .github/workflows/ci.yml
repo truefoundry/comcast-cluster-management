@@ -21,15 +21,14 @@ jobs:
       image_artifact_name: spark-job-fallback-management
       image_tag: ${{ github.sha }}
       extra_image_tag: ${{ github.ref_name }}
-      enable_jfrog: false
-      enable_public_ecr: true
-      ecr_repository_url: public.ecr.aws/truefoundrycloud
+      # Using JFrog only (no ECR)
+      enable_jfrog: true
+      enable_public_ecr: false
       artifactory_registry_url: tfy.jfrog.io
-      artifactory_repository_url: tfy.jfrog.io/sparkjob-fallback-management
+      artifactory_repository_url: tfy.jfrog.io/tfy-images
       dockerfile_path: Dockerfile
       image_context: '.'
       platforms: 'linux/amd64'
     secrets:
       artifactory_username: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_USERNAME }}
       artifactory_password: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_PASSWORD }}
-      ecr_role_arn: ${{ secrets.AWS_ECR_IAM_ROLE_ARN }}
