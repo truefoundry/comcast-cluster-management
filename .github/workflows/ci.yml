@@ -23,8 +23,8 @@ jobs:
       extra_image_tag: ${{ github.ref_name }}
       enable_jfrog: true
       enable_public_ecr: false
-      artifactory_registry_url: ${{ vars.TRUEFOUNDRY_ARTIFACTORY_REGISTRY_URL }}
-      artifactory_repository_url: ${{ vars.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_REPOSITORY }}
+      artifactory_registry_url: tfy.jfrog.io
+      artifactory_repository_url: tfy.jfrog.io/sparkjob-fallback-management
       dockerfile_path: Dockerfile
       image_context: '.'
       platforms: 'linux/amd64'
