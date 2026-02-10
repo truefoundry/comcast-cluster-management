@@ -20,7 +20,7 @@ jobs:
     with:
       image_artifact_name: spark-job-fallback-management
       image_tag: ${{ github.sha }}
-      extra_image_tag: ${{ github.ref_name }}
+      # extra_image_tag: ${{ github.ref_name }}
       # Using JFrog only (no ECR)
       enable_jfrog: true
       enable_public_ecr: false
