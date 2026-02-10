@@ -3,18 +3,11 @@ name: Build and Publish Cluster Management
 on:
   release:
     types: [published]
-  # Manual trigger for testing
-  workflow_dispatch:
-    inputs:
-      skip_chart_update:
-        description: 'Skip chart update (for testing build only)'
-        required: false
-        default: 'true'
-        type: boolean
-  # Trigger on feature branch for testing
+  workflow_dispatch:  # Manual trigger
   push:
     branches:
       - 'feat/fallback-helm-*'
+      - 'main'
 
 concurrency:
   group: build-${{ github.ref }}
@@ -26,7 +19,7 @@ permissions:
 
 jobs:
   build_container:
-    name: Build
+    name: Build and Push Docker Image
     uses: truefoundry/workflows/.github/workflows/build.yml@main
     with:
       image_tag: ${{ github.sha }}
@@ -41,88 +34,3 @@ jobs:
       artifactory_username: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_USERNAME }}
       artifactory_password: ${{ secrets.TRUEFOUNDRY_ARTIFACTORY_PRIVATE_PASSWORD }}
       ecr_iam_role_arn: ${{ secrets.AWS_DEVTEST_ECR_IAM_ROLE_ARN }}
-
-  update_chart:
-    name: Update Chart
-    needs: build_container
-    runs-on: ubuntu-latest
-    # Only run on release, skip for testing
-    if: github.event_name == 'release'
-    steps:
-      - name: Checkout current repo
-        uses: actions/checkout@v4
-
-      - name: Checkout infra-charts
-        uses: actions/checkout@v4
-        with:
-          repository: truefoundry/infra-charts
-          ref: 'main'
-          token: ${{ secrets.TF_GITHUB_CI_ADMIN_TOKEN }}
-          path: tmp_ahc
-
-      - name: Update values.yaml file
-        uses: truefoundry/tfy-env-to-yaml-gh@github-action
-        with:
-          envPath: 'env.default'
-          outputFile: 'tmp_ahc/charts/spark-job-fallback-management/values.yaml'
-          imageTag: '${{ github.ref_name }}'
-
-      - name: Write release version
-        run: |
-          VERSION=${{ github.event.release.tag_name }}
-          echo "RELEASE_VERSION=${VERSION#v}" >> $GITHUB_ENV
-
-      - name: Update Chart version
-        uses: mikefarah/yq@v4.34.1
-        with:
-          cmd: yq -i '.version = "${{ env.RELEASE_VERSION }}"' tmp_ahc/charts/spark-job-fallback-management/Chart.yaml
-
-      - name: Update appVersion
-        uses: mikefarah/yq@v4.34.1
-        with:
-          cmd: yq -i '.appVersion = "${{ env.RELEASE_VERSION }}"' tmp_ahc/charts/spark-job-fallback-management/Chart.yaml
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          commit-message: '[CI] Update spark-job-fallback-management chart to ${{ github.event.release.tag_name }}'
-          branch: spark-job-fallback-management-${{ github.event.release.tag_name }}
-          base: main
-          path: tmp_ahc
-          title: '[CI] Update spark-job-fallback-management chart to ${{ github.event.release.tag_name }}'
-          token: ${{ secrets.TF_GITHUB_CI_ADMIN_TOKEN }}
-
-  update_helm_chart:
-    name: Update Helm Chart
-    needs: build_container
-    runs-on: ubuntu-latest
-    # Only run on release, skip for testing
-    if: github.event_name == 'release'
-    steps:
-      - name: Checkout helm-charts
-        uses: actions/checkout@v4
-        with:
-          repository: truefoundry/helm-charts
-          ref: 'main'
-          token: ${{ secrets.TF_GITHUB_CI_ADMIN_TOKEN }}
-          path: helm_charts
-
-      - name: Write release version
-        run: |
-          VERSION=${{ github.event.release.tag_name }}
-          echo "RELEASE_VERSION=${VERSION#v}" >> $GITHUB_ENV
-
-      - name: Update spark-job-fallback-management version in truefoundry chart
-        uses: mikefarah/yq@v4.34.1
-        with:
-          cmd: yq -i '(.dependencies[] | select(.name == "spark-job-fallback-management") | .version) = "${{ env.RELEASE_VERSION }}"' helm_charts/charts/truefoundry/Chart.yaml
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
-        with:
-          commit-message: '[CI] Update spark-job-fallback-management version to ${{ github.event.release.tag_name }}'
-          branch: update-spark-job-fallback-management-${{ github.event.release.tag_name }}
-          base: main
-          path: helm_charts
-          title: '[CI] Update spark-job-fallback-management version to ${{ github.event.release.tag_name }}'
-          token: ${{ secrets.TF_GITHUB_CI_ADMIN_TOKEN }}
