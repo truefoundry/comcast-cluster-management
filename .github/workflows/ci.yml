@@ -25,8 +25,8 @@ jobs:
       enable_jfrog: true
       enable_public_ecr: false
       artifactory_registry_url: tfy.jfrog.io
-      # artifactory_repository_url: tfy.jfrog.io/tfy-private-images
-      artifactory_repository_url: tfy.jfrog.io/tfy-images
+      artifactory_repository_url: tfy.jfrog.io/tfy-private-images
+      # artifactory_repository_url: tfy.jfrog.io/tfy-images
       dockerfile_path: Dockerfile
       image_context: '.'
       platforms: 'linux/amd64'
