@@ -47,6 +47,27 @@ service:
   type: ClusterIP
   port: 8000
 
+# Ingress configuration (for external access)
+ingress:
+  # Set to true to create an Ingress resource
+  enabled: false
+  # Ingress class name (e.g., nginx, traefik, istio)
+  className: ""
+  # Annotations for the ingress (e.g., cert-manager, auth)
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # cert-manager.io/cluster-issuer: letsencrypt-prod
+  # Hostname for the ingress
+  host: ""
+  # Path for the ingress rule
+  path: /
+  # Path type: Prefix, Exact, or ImplementationSpecific
+  pathType: Prefix
+  # Enable TLS
+  tls: false
+  # TLS secret name (if using existing certificate)
+  tlsSecret: ""
+
 # Resource requests and limits
 # These match the current TrueFoundry deployment settings
 resources:
