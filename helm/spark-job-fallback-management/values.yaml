@@ -8,7 +8,7 @@ replicaCount: 1
 # Container image configuration
 image:
   # GitHub Container Registry (public - no auth needed for pulls)
-  repository: "ghcr.io/truefoundry/spark-job-fallback-management"
+  repository: "ghcr.io/vivek-tfy/spark-job-fallback-management"
   # Image pull policy
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion
