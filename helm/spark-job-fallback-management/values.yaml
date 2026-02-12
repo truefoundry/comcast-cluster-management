@@ -7,14 +7,14 @@ replicaCount: 1
 
 # Container image configuration
 image:
-  # Repository should be set when deploying (e.g., your Docker registry)
-  repository: ""
+  # GitHub Container Registry (public - no auth needed for pulls)
+  repository: "ghcr.io/truefoundry/spark-job-fallback-management"
   # Image pull policy
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion
   tag: "latest"
 
-# Image pull secrets for private registries
+# No imagePullSecrets needed for public images on ghcr.io
 imagePullSecrets: []
 
 # Override the name of the chart
