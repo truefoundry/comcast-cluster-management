@@ -1,0 +1,45 @@
+name: CI - Build and Push
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+  push:
+    branches:
+      - 'feat/fallback-helm-*'
+      - 'main'
+
+permissions:
+  contents: read
+  packages: write  # Required for ghcr.io
+
+jobs:
+  build:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: vivek-tfy
+          password: ${{ secrets.GHCR_PAT }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ghcr.io/vivek-tfy/spark-job-fallback-management:${{ github.sha }}
+            ghcr.io/vivek-tfy/spark-job-fallback-management:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
