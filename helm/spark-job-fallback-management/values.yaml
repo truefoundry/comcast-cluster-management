@@ -47,6 +47,21 @@ service:
   type: ClusterIP
   port: 8000
 
+# Ingress configuration (exposes service to internet via Istio)
+ingress:
+  # Set to true to expose the service externally
+  enabled: true
+  
+  # Traditional Istio gateway reference (namespace/name format)
+  gateway: "istio-system/tfy-wildcard"
+  
+  # Your domain/hostname (choose one of the wildcard patterns from tfy-wildcard gateway)
+  # Options: *.tfy-usea1-ctl.devtest.truefoundry.tech or *.tenants.devtest.truefoundry.tech
+  host: "spark-fallback.tfy-usea1-ctl.devtest.truefoundry.tech"
+  
+  # Path prefix (default: /)
+  path: "/"
+
 # Resource requests and limits
 # These match the current TrueFoundry deployment settings
 resources:
