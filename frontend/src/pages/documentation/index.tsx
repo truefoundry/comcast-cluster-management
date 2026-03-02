@@ -1,4 +1,4 @@
-import { BookOpen } from "lucide-react"
+import { BookOpen } from 'lucide-react';
 import {
   WhatIsClusterFallback,
   HowItWorks,
@@ -8,7 +8,7 @@ import {
   DeploymentSetup,
   EnvironmentVariables,
   JobMigrationFlow,
-} from "./components"
+} from './components';
 
 const Documentation = () => {
   return (
@@ -41,7 +41,7 @@ const Documentation = () => {
       <EnvironmentVariables />
       <JobMigrationFlow />
     </div>
-  )
-}
+  );
+};
 
-export default Documentation
+export default Documentation;

@@ -1,7 +1,7 @@
-import type { RouteObject } from "react-router-dom"
-import MainLayout from "@/layout/MainLayout"
-import ClusterManagement from "@/pages/cluster-management"
-import Documentation from "@/pages/documentation"
+import type { RouteObject } from 'react-router-dom';
+import MainLayout from '@/layout/MainLayout';
+import ClusterManagement from '@/pages/cluster-management';
+import Documentation from '@/pages/documentation';
 
 const routes: RouteObject[] = [
   {
@@ -12,11 +12,11 @@ const routes: RouteObject[] = [
         element: <ClusterManagement />,
       },
       {
-        path: "docs",
+        path: 'docs',
         element: <Documentation />,
       },
     ],
   },
-]
+];
 
-export default routes
+export default routes;

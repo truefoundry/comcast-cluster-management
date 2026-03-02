@@ -1,15 +1,15 @@
-import { ArrowRight } from "lucide-react";
-import { useMemo } from "react";
+import { ArrowRight } from 'lucide-react';
+import { useMemo } from 'react';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import type { Cluster, Workspace } from "@/lib/types";
+} from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import type { Cluster, Workspace } from '@/lib/types';
 
 export interface ConfigurationFormData {
   sourceCluster: string;
@@ -51,22 +51,22 @@ const ConfigurationForm = ({
     const newData = { ...formData, [field]: value };
 
     // When source cluster changes, clear source workspace if it doesn't belong to the new cluster
-    if (field === "sourceCluster") {
+    if (field === 'sourceCluster') {
       const currentWorkspace = workspaces.find(
         (w) => w.id === formData.sourceWorkspace,
       );
       if (currentWorkspace && currentWorkspace.clusterId !== value) {
-        newData.sourceWorkspace = "";
+        newData.sourceWorkspace = '';
       }
     }
 
     // When destination cluster changes, clear destination workspace if it doesn't belong to the new cluster
-    if (field === "destinationCluster") {
+    if (field === 'destinationCluster') {
       const currentWorkspace = workspaces.find(
         (w) => w.id === formData.destinationWorkspace,
       );
       if (currentWorkspace && currentWorkspace.clusterId !== value) {
-        newData.destinationWorkspace = "";
+        newData.destinationWorkspace = '';
       }
     }
 
@@ -85,7 +85,7 @@ const ConfigurationForm = ({
           <Label htmlFor={`${idPrefix}-source-cluster`}>Cluster</Label>
           <Select
             value={formData.sourceCluster}
-            onValueChange={(value) => updateField("sourceCluster", value)}
+            onValueChange={(value) => updateField('sourceCluster', value)}
           >
             <SelectTrigger id={`${idPrefix}-source-cluster`}>
               <SelectValue placeholder="Select source cluster" />
@@ -104,15 +104,15 @@ const ConfigurationForm = ({
           <Label htmlFor={`${idPrefix}-source-workspace`}>Workspace</Label>
           <Select
             value={formData.sourceWorkspace}
-            onValueChange={(value) => updateField("sourceWorkspace", value)}
+            onValueChange={(value) => updateField('sourceWorkspace', value)}
             disabled={!formData.sourceCluster}
           >
             <SelectTrigger id={`${idPrefix}-source-workspace`}>
               <SelectValue
                 placeholder={
                   formData.sourceCluster
-                    ? "Select source workspace"
-                    : "Select a cluster first"
+                    ? 'Select source workspace'
+                    : 'Select a cluster first'
                 }
               />
             </SelectTrigger>
@@ -132,7 +132,7 @@ const ConfigurationForm = ({
             id={`${idPrefix}-source-job-id`}
             placeholder="Enter job ID"
             value={formData.sourceJobId}
-            onChange={(e) => updateField("sourceJobId", e.target.value)}
+            onChange={(e) => updateField('sourceJobId', e.target.value)}
           />
         </div>
       </div>
@@ -153,7 +153,7 @@ const ConfigurationForm = ({
           <Label htmlFor={`${idPrefix}-destination-cluster`}>Cluster</Label>
           <Select
             value={formData.destinationCluster}
-            onValueChange={(value) => updateField("destinationCluster", value)}
+            onValueChange={(value) => updateField('destinationCluster', value)}
           >
             <SelectTrigger id={`${idPrefix}-destination-cluster`}>
               <SelectValue placeholder="Select fallback cluster" />
@@ -173,7 +173,7 @@ const ConfigurationForm = ({
           <Select
             value={formData.destinationWorkspace}
             onValueChange={(value) =>
-              updateField("destinationWorkspace", value)
+              updateField('destinationWorkspace', value)
             }
             disabled={!formData.destinationCluster}
           >
@@ -181,8 +181,8 @@ const ConfigurationForm = ({
               <SelectValue
                 placeholder={
                   formData.destinationCluster
-                    ? "Select fallback workspace"
-                    : "Select a cluster first"
+                    ? 'Select fallback workspace'
+                    : 'Select a cluster first'
                 }
               />
             </SelectTrigger>

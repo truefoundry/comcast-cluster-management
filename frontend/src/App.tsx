@@ -1,8 +1,8 @@
-import { BrowserRouter } from "react-router-dom"
-import { ThemeProvider } from "@/components/theme-provider"
-import { Toaster } from "@/components/ui/sonner"
+import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/sonner';
 
-import AppRoutes from "./routes"
+import AppRoutes from './routes';
 
 const App = () => {
   return (
@@ -12,7 +12,7 @@ const App = () => {
       </BrowserRouter>
       <Toaster position="top-center" richColors closeButton />
     </ThemeProvider>
-  )
-}
+  );
+};
 
-export default App
+export default App;
