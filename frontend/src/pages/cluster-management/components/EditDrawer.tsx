@@ -6,20 +6,22 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-} from "@/components/ui/drawer"
-import { Button } from "@/components/ui/button"
-import ConfigurationForm, { type ConfigurationFormData } from "./ConfigurationForm"
-import type { Cluster, Workspace } from "@/lib/types"
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import ConfigurationForm, {
+  type ConfigurationFormData,
+} from './ConfigurationForm';
+import type { Cluster, Workspace } from '@/lib/types';
 
 interface EditDrawerProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  formData: ConfigurationFormData
-  onFormChange: (data: ConfigurationFormData) => void
-  onSubmit: () => void
-  clusters: Cluster[]
-  workspaces: Workspace[]
-  isSubmitting?: boolean
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  formData: ConfigurationFormData;
+  onFormChange: (data: ConfigurationFormData) => void;
+  onSubmit: () => void;
+  clusters: Cluster[];
+  workspaces: Workspace[];
+  isSubmitting?: boolean;
 }
 
 const EditDrawer = ({
@@ -36,7 +38,7 @@ const EditDrawer = ({
     formData.sourceCluster &&
     formData.sourceWorkspace &&
     formData.destinationCluster &&
-    formData.destinationWorkspace
+    formData.destinationWorkspace;
 
   return (
     <Drawer direction="right" open={isOpen} onOpenChange={onOpenChange}>
@@ -60,7 +62,7 @@ const EditDrawer = ({
 
         <DrawerFooter className="border-t">
           <Button onClick={onSubmit} disabled={!isFormValid || isSubmitting}>
-            {isSubmitting ? "Saving..." : "Save Changes"}
+            {isSubmitting ? 'Saving...' : 'Save Changes'}
           </Button>
           <DrawerClose asChild>
             <Button variant="outline" disabled={isSubmitting}>
@@ -70,7 +72,7 @@ const EditDrawer = ({
         </DrawerFooter>
       </DrawerContentRight>
     </Drawer>
-  )
-}
+  );
+};
 
-export default EditDrawer
+export default EditDrawer;

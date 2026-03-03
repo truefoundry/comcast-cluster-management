@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react"
+import { Plus } from 'lucide-react';
 import {
   Drawer,
   DrawerClose,
@@ -8,20 +8,22 @@ import {
   DrawerHeader,
   DrawerTitle,
   DrawerTrigger,
-} from "@/components/ui/drawer"
-import { Button } from "@/components/ui/button"
-import ConfigurationForm, { type ConfigurationFormData } from "./ConfigurationForm"
-import type { Cluster, Workspace } from "@/lib/types"
+} from '@/components/ui/drawer';
+import { Button } from '@/components/ui/button';
+import ConfigurationForm, {
+  type ConfigurationFormData,
+} from './ConfigurationForm';
+import type { Cluster, Workspace } from '@/lib/types';
 
 interface CreateDrawerProps {
-  isOpen: boolean
-  onOpenChange: (open: boolean) => void
-  formData: ConfigurationFormData
-  onFormChange: (data: ConfigurationFormData) => void
-  onSubmit: () => void
-  clusters: Cluster[]
-  workspaces: Workspace[]
-  isSubmitting?: boolean
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  formData: ConfigurationFormData;
+  onFormChange: (data: ConfigurationFormData) => void;
+  onSubmit: () => void;
+  clusters: Cluster[];
+  workspaces: Workspace[];
+  isSubmitting?: boolean;
 }
 
 const CreateDrawer = ({
@@ -38,7 +40,7 @@ const CreateDrawer = ({
     formData.sourceCluster &&
     formData.sourceWorkspace &&
     formData.destinationCluster &&
-    formData.destinationWorkspace
+    formData.destinationWorkspace;
 
   return (
     <Drawer direction="right" open={isOpen} onOpenChange={onOpenChange}>
@@ -68,7 +70,7 @@ const CreateDrawer = ({
 
         <DrawerFooter className="border-t">
           <Button onClick={onSubmit} disabled={!isFormValid || isSubmitting}>
-            {isSubmitting ? "Creating..." : "Create Configuration"}
+            {isSubmitting ? 'Creating...' : 'Create Configuration'}
           </Button>
           <DrawerClose asChild>
             <Button variant="outline" disabled={isSubmitting}>
@@ -78,7 +80,7 @@ const CreateDrawer = ({
         </DrawerFooter>
       </DrawerContentRight>
     </Drawer>
-  )
-}
+  );
+};
 
-export default CreateDrawer
+export default CreateDrawer;

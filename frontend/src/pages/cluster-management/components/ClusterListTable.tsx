@@ -1,5 +1,5 @@
-import { useMemo } from "react"
-import { ArrowRight, Pencil, Trash2 } from "lucide-react"
+import { useMemo } from 'react';
+import { ArrowRight, Pencil, Trash2 } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -7,37 +7,43 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import type { ClusterFallbackConfig, Cluster, Workspace } from "@/lib/types"
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import type { ClusterFallbackConfig, Cluster, Workspace } from '@/lib/types';
 
 interface ClusterListTableProps {
-  data: ClusterFallbackConfig[]
-  clusters: Cluster[]
-  workspaces: Workspace[]
-  onEdit: (config: ClusterFallbackConfig) => void
-  onDelete: (config: ClusterFallbackConfig) => void
+  data: ClusterFallbackConfig[];
+  clusters: Cluster[];
+  workspaces: Workspace[];
+  onEdit: (config: ClusterFallbackConfig) => void;
+  onDelete: (config: ClusterFallbackConfig) => void;
 }
 
-const ClusterListTable = ({ data, clusters, workspaces, onEdit, onDelete }: ClusterListTableProps) => {
+const ClusterListTable = ({
+  data,
+  clusters,
+  workspaces,
+  onEdit,
+  onDelete,
+}: ClusterListTableProps) => {
   // Ensure data is always an array
-  const configs = Array.isArray(data) ? data : []
+  const configs = Array.isArray(data) ? data : [];
 
   // Create lookup maps for names
   const clusterNameMap = useMemo(() => {
-    const map = new Map<string, string>()
-    clusters.forEach((c) => map.set(c.id, c.name))
-    return map
-  }, [clusters])
+    const map = new Map<string, string>();
+    clusters.forEach((c) => map.set(c.id, c.name));
+    return map;
+  }, [clusters]);
 
   const workspaceNameMap = useMemo(() => {
-    const map = new Map<string, string>()
-    workspaces.forEach((w) => map.set(w.id, w.name))
-    return map
-  }, [workspaces])
+    const map = new Map<string, string>();
+    workspaces.forEach((w) => map.set(w.id, w.name));
+    return map;
+  }, [workspaces]);
 
-  const getClusterName = (id: string) => clusterNameMap.get(id) || id
-  const getWorkspaceName = (id: string) => workspaceNameMap.get(id) || id
+  const getClusterName = (id: string) => clusterNameMap.get(id) || id;
+  const getWorkspaceName = (id: string) => workspaceNameMap.get(id) || id;
 
   return (
     <div className="rounded-lg border bg-card">
@@ -56,7 +62,10 @@ const ClusterListTable = ({ data, clusters, workspaces, onEdit, onDelete }: Clus
         <TableBody>
           {configs.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+              <TableCell
+                colSpan={7}
+                className="text-center text-muted-foreground py-8"
+              >
                 No configurations found
               </TableCell>
             </TableRow>
@@ -64,12 +73,18 @@ const ClusterListTable = ({ data, clusters, workspaces, onEdit, onDelete }: Clus
           {configs.map((config) => (
             <TableRow key={config.id}>
               <TableCell>
-                <code className="rounded bg-muted px-2 py-1 text-sm font-mono" title={config.source.clusterId}>
+                <code
+                  className="rounded bg-muted px-2 py-1 text-sm font-mono"
+                  title={config.source.clusterId}
+                >
                   {getClusterName(config.source.clusterId)}
                 </code>
               </TableCell>
               <TableCell>
-                <code className="rounded bg-muted px-2 py-1 text-sm font-mono" title={config.source.workspaceId}>
+                <code
+                  className="rounded bg-muted px-2 py-1 text-sm font-mono"
+                  title={config.source.workspaceId}
+                >
                   {getWorkspaceName(config.source.workspaceId)}
                 </code>
               </TableCell>
@@ -86,12 +101,18 @@ const ClusterListTable = ({ data, clusters, workspaces, onEdit, onDelete }: Clus
                 <ArrowRight className="h-4 w-4 text-muted-foreground" />
               </TableCell>
               <TableCell>
-                <code className="rounded bg-accent px-2 py-1 text-sm font-mono" title={config.destination.clusterId}>
+                <code
+                  className="rounded bg-accent px-2 py-1 text-sm font-mono"
+                  title={config.destination.clusterId}
+                >
                   {getClusterName(config.destination.clusterId)}
                 </code>
               </TableCell>
               <TableCell>
-                <code className="rounded bg-accent px-2 py-1 text-sm font-mono" title={config.destination.workspaceId}>
+                <code
+                  className="rounded bg-accent px-2 py-1 text-sm font-mono"
+                  title={config.destination.workspaceId}
+                >
                   {getWorkspaceName(config.destination.workspaceId)}
                 </code>
               </TableCell>
@@ -122,7 +143,7 @@ const ClusterListTable = ({ data, clusters, workspaces, onEdit, onDelete }: Clus
         </TableBody>
       </Table>
     </div>
-  )
-}
+  );
+};
 
-export default ClusterListTable
+export default ClusterListTable;

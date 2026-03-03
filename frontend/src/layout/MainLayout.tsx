@@ -1,7 +1,7 @@
-import { Suspense } from "react"
-import { Outlet } from "react-router-dom"
-import { Sidebar } from "@/components/ui/sidebar"
-import { Spin } from "@/components/ui/spin"
+import { Suspense } from 'react';
+import { Outlet } from 'react-router-dom';
+import { Sidebar } from '@/components/ui/sidebar';
+import { Spin } from '@/components/ui/spin';
 
 const MainLayout = () => {
   return (
@@ -19,7 +19,7 @@ const MainLayout = () => {
         </Suspense>
       </main>
     </div>
-  )
-}
+  );
+};
 
-export default MainLayout
+export default MainLayout;

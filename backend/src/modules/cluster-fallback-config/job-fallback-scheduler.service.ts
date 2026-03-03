@@ -153,23 +153,10 @@ export class JobFallbackSchedulerService implements OnModuleInit {
    * Pattern: ^[a-z](?:[a-z0-9]|-(?!-)){1,30}[a-z0-9]$ (max 32 chars)
    */
   private generateFallbackName(baseName: string): string {
-    // Sanitize base name: lowercase, replace invalid chars with hyphens
-    const sanitized = baseName
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-') // Remove consecutive hyphens
-      .replace(/^-|-$/g, ''); // Remove leading/trailing hyphens
+    const sanitized = baseName.replace(/^-+|-+$/g, '');
 
-    // Generate random suffix (7 chars)
-    const randomSuffix = Math.random().toString(36).substring(2, 9);
+    let result = `${sanitized}-fallback`;
 
-    // Truncate base to fit: 32 - 4 ("-fb-") - 7 (suffix) = 21 chars max
-    const truncatedBase = sanitized.substring(0, 21);
-
-    // Ensure result starts with letter and ends with alphanumeric
-    let result = `${truncatedBase}-fb-${randomSuffix}`;
-
-    // Ensure starts with letter
     if (!/^[a-z]/.test(result)) {
       result = 'j' + result.substring(1);
     }

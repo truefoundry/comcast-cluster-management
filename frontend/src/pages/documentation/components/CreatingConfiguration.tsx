@@ -1,4 +1,4 @@
-import { ArrowRight } from "lucide-react"
+import { ArrowRight } from 'lucide-react';
 
 export const CreatingConfiguration = () => {
   return (
@@ -11,30 +11,47 @@ export const CreatingConfiguration = () => {
         <ol className="space-y-3 text-muted-foreground">
           <li className="flex gap-3">
             <span className="text-primary font-medium">1.</span>
-            Navigate to <strong className="text-foreground">Cluster Management</strong> from the sidebar.
+            Navigate to{' '}
+            <strong className="text-foreground">Cluster Management</strong> from
+            the sidebar.
           </li>
           <li className="flex gap-3">
             <span className="text-primary font-medium">2.</span>
-            Click the <strong className="text-foreground">Create Configuration</strong> button.
+            Click the{' '}
+            <strong className="text-foreground">
+              Create Configuration
+            </strong>{' '}
+            button.
           </li>
           <li className="flex gap-3">
             <span className="text-primary font-medium">3.</span>
-            Select a <strong className="text-foreground">Source Cluster</strong> and <strong className="text-foreground">Workspace</strong> to monitor.
+            Select a <strong className="text-foreground">
+              Source Cluster
+            </strong>{' '}
+            and <strong className="text-foreground">Workspace</strong> to
+            monitor.
           </li>
           <li className="flex gap-3">
             <span className="text-primary font-medium">4.</span>
-            (Optional) Enter a specific <strong className="text-foreground">Job ID</strong> or leave empty to monitor all jobs.
+            (Optional) Enter a specific{' '}
+            <strong className="text-foreground">Job ID</strong> or leave empty
+            to monitor all jobs.
           </li>
           <li className="flex gap-3">
             <span className="text-primary font-medium">5.</span>
-            Select a <strong className="text-foreground">Destination Cluster</strong> and <strong className="text-foreground">Workspace</strong> for fallback.
+            Select a{' '}
+            <strong className="text-foreground">
+              Destination Cluster
+            </strong> and <strong className="text-foreground">Workspace</strong>{' '}
+            for fallback.
           </li>
           <li className="flex gap-3">
             <span className="text-primary font-medium">6.</span>
-            Click <strong className="text-foreground">Create</strong> to save the configuration.
+            Click <strong className="text-foreground">Create</strong> to save
+            the configuration.
           </li>
         </ol>
       </div>
     </section>
-  )
-}
+  );
+};
