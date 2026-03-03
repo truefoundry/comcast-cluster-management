@@ -156,7 +156,6 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     const sanitized = baseName
       .toLowerCase()
       .replace(/[^a-z0-9-]/g, '-')
-      .replace(/-+/g, '-')
       .replace(/^-+|-+$/g, '');
 
     let result = `${sanitized}-fallback`;
