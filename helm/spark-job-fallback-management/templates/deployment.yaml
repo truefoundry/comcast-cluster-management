@@ -6,6 +6,8 @@ metadata:
     {{- include "spark-job-fallback-management.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "spark-job-fallback-management.selectorLabels" . | nindent 6 }}
