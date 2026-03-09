@@ -94,6 +94,24 @@ jobFallback:
   triggerRetryDelayMs: 15000
   stuckThresholdMinutes: 60
 
+# TruFoundry Authentication (TrueFoundryInteractiveLogin equivalent)
+# Enables OAuth2 + JWT authentication via Istio EnvoyFilter
+auth:
+  enabled: true
+  # OAuth2 client ID from TruFoundry (the application ID)
+  clientId: "895253af-ec9d-4be6-83d1-6f248e644e79"
+  # TruFoundry internal host (without protocol)
+  truefoundryInternalHost: "internal.devtest.truefoundry.tech"
+  # SDS server URI for OAuth2 secrets (HMAC + token)
+  sdsServerUri: "tfy-agent-devtest-sds-server.tfy-agent.svc.cluster.local:8000"
+  # JWT issuer (usually truefoundry.com)
+  jwtIssuer: "truefoundry.com"
+  # OAuth2 callback and signout paths
+  callbackPath: "/_auth/callback"
+  signoutPath: "/_auth/signout"
+  # Refresh token lifetime
+  refreshTokenExpiresIn: "432000s"
+
 # Additional custom environment variables
 env: {}
 

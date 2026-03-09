@@ -17,6 +17,9 @@ spec:
       {{- end }}
       labels:
         {{- include "spark-job-fallback-management.selectorLabels" . | nindent 8 }}
+        {{- if .Values.auth.enabled }}
+        sidecar.istio.io/inject: "true"
+        {{- end }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

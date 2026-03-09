@@ -1,0 +1,23 @@
+{{- if .Values.auth.enabled -}}
+{{- $clientId := required "auth.clientId is required when auth is enabled" .Values.auth.clientId -}}
+{{- $tfyHost := .Values.auth.truefoundryInternalHost -}}
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: {{ include "spark-job-fallback-management.fullname" . }}-jwt-authn
+  labels:
+    {{- include "spark-job-fallback-management.labels" . | nindent 4 }}
+spec:
+  jwtRules:
+    - issuer: {{ .Values.auth.jwtIssuer }}
+      audiences:
+        - {{ $clientId }}
+      jwksUri: https://{{ $tfyHost }}/api/svc/v1/keys/jwks
+      forwardOriginalToken: true
+      fromHeaders:
+        - name: Authorization
+          prefix: "Bearer "
+  selector:
+    matchLabels:
+      {{- include "spark-job-fallback-management.selectorLabels" . | nindent 6 }}
+{{- end }}

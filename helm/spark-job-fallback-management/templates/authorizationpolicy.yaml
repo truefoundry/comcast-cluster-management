@@ -1,0 +1,28 @@
+{{- if .Values.auth.enabled -}}
+{{- $host := .Values.ingress.host -}}
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: {{ include "spark-job-fallback-management.fullname" . }}-jwt-authz
+  labels:
+    {{- include "spark-job-fallback-management.labels" . | nindent 4 }}
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            requestPrincipals:
+              - "*"
+      to:
+        - operation:
+            hosts:
+              - {{ $host | quote }}
+      when: []
+    - to:
+        - operation:
+            notHosts:
+              - {{ $host | quote }}
+  selector:
+    matchLabels:
+      {{- include "spark-job-fallback-management.selectorLabels" . | nindent 6 }}
+{{- end }}
