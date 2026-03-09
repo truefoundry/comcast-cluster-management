@@ -25,6 +25,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      serviceAccountName: {{ include "spark-job-fallback-management.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -50,7 +51,10 @@ spec:
               value: {{ .Values.truefoundryApi.url | quote }}
             {{- if .Values.truefoundryApi.serviceApiToken }}
             - name: TF_SERVICE_API_TOKEN
-              value: {{ .Values.truefoundryApi.serviceApiToken | quote }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "spark-job-fallback-management.fullname" . }}-truefoundry-api
+                  key: service-api-token
             {{- end }}
             - name: JOB_FALLBACK_ENABLED
               value: {{ .Values.jobFallback.enabled | quote }}

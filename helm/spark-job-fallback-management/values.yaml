@@ -74,6 +74,8 @@ resources:
 
 # Persistent storage (auto-created by Helm)
 persistence:
+  # PVC access mode (ReadWriteOnce requires replicaCount=1)
+  accessMode: ReadWriteOnce
   # Storage size for /app/data
   size: 1Gi
   # Storage class (leave empty for cluster default)
