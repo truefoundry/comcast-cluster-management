@@ -14,7 +14,7 @@
 #   5. Update "volume_fqn" to match the volume name from volume.yaml
 #      Format: tfy-volume://<cluster>:<workspace>:<volume-name>
 
-name: cluster-management-test
+name: cluster-management
 type: service
 
 image:
@@ -52,7 +52,7 @@ ports:
   - auth:
       type: truefoundry_oauth
     # {{CUSTOMER_HOST}} - Your service endpoint
-    host: cluster-management-test-vivek-ks-devtest-8000.tfy-usea1-ctl.devtest.truefoundry.tech
+    host: cluster-management-vivek-ks-devtest-8000.tfy-usea1-ctl.devtest.truefoundry.tech
     port: 8000
     expose: true
     protocol: TCP
@@ -63,7 +63,7 @@ mounts:
     mount_path: /app/data
     # Must match the volume created via volume.yaml
     # Format: tfy-volume://<cluster>:<workspace>:<volume-name>
-    volume_fqn: tfy-volume://tfy-usea1-devtest:vivek-ks-devtest:cluster-management-data-test
+    volume_fqn: tfy-volume://tfy-usea1-devtest:vivek-ks-devtest:cluster-management-data
 
 replicas: 1
 

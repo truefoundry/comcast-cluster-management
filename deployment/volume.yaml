@@ -11,7 +11,7 @@
 #      Format: <volume-name>-<workspace>.tfy-usea1-ctl.<domain>
 #   4. Adjust "size" (in GB) and "storage_class" as needed for your cluster
 
-name: cluster-management-data-test
+name: cluster-management-data
 type: volume
 config:
   # Size in GB
@@ -26,4 +26,4 @@ workspace_fqn: tfy-usea1-devtest:vivek-ks-devtest
 volume_browser:
   endpoint:
     # {{CUSTOMER_VOLUME_HOST}} - Endpoint for the volume browser UI
-    host: cluster-management-data-test-vivek-ks-devtest.tfy-usea1-ctl.devtest.truefoundry.tech
+    host: cluster-management-data-vivek-ks-devtest.tfy-usea1-ctl.devtest.truefoundry.tech
