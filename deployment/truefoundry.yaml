@@ -1,0 +1,84 @@
+# Cluster Management Service
+# --------------------------
+# Manages job fallback scheduling and cluster operations.
+# Deploy AFTER the volume is created: tfy deploy -f truefoundry.yaml --no-wait
+# Or use: ./deploy.sh to deploy both volume and service in order.
+#
+# CUSTOMER SETUP:
+#   1. Replace "workspace_fqn" with your TrueFoundry workspace FQN
+#   2. Replace "TRUEFOUNDRY_API_URL" with your control plane URL
+#   3. Replace "TF_SERVICE_API_TOKEN" with your secret FQN
+#      Create a secret group in TrueFoundry and store your API token there
+#      Format: tfy-secret://<tenant>:<secret-group>:<key>
+#   4. Replace "host" under ports with your desired service endpoint
+#   5. Update "volume_fqn" to match the volume name from volume.yaml
+#      Format: tfy-volume://<cluster>:<workspace>:<volume-name>
+
+name: cluster-management-test
+type: service
+
+image:
+  type: build
+  build_spec:
+    type: dockerfile
+    dockerfile_path: ./Dockerfile
+    build_context_path: ./
+  build_source:
+    type: git
+    repo_url: https://github.com/truefoundry/comcast-cluster-management
+    # Branch, tag, or commit SHA to build from
+    ref: main
+
+env:
+  PORT: '8000'
+  DATA_DIR: /app/data
+  NODE_ENV: production
+  SFY_ASSUMED_USER: truefoundry
+
+  # {{CUSTOMER_CONTROL_PLANE_URL}} - Your TrueFoundry control plane URL
+  TRUEFOUNDRY_API_URL: https://internal.devtest.truefoundry.tech/api/svc
+
+  # {{CUSTOMER_SECRET_FQN}} - API token from your TrueFoundry secret store
+  TF_SERVICE_API_TOKEN: 'tfy-secret://truefoundry:cluster-fallback-management:TF_SERVICE_API_TOKEN'
+
+  # Job fallback scheduler settings
+  JOB_FALLBACK_ENABLED: 'true'
+  JOB_FALLBACK_TRIGGER_DELAY_MS: '15000'
+  JOB_FALLBACK_TRIGGER_MAX_RETRIES: '3'
+  JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS: '15000'
+  JOB_FALLBACK_STUCK_THRESHOLD_MINUTES: '60'
+
+ports:
+  - auth:
+      type: truefoundry_oauth
+    # {{CUSTOMER_HOST}} - Your service endpoint
+    host: cluster-management-test-vivek-ks-devtest-8000.tfy-usea1-ctl.devtest.truefoundry.tech
+    port: 8000
+    expose: true
+    protocol: TCP
+    app_protocol: http
+
+mounts:
+  - type: volume
+    mount_path: /app/data
+    # Must match the volume created via volume.yaml
+    # Format: tfy-volume://<cluster>:<workspace>:<volume-name>
+    volume_fqn: tfy-volume://tfy-usea1-devtest:vivek-ks-devtest:cluster-management-data-test
+
+replicas: 1
+
+resources:
+  node:
+    type: node_selector
+    capacity_type: spot_fallback_on_demand
+  cpu_limit: 0.5
+  cpu_request: 0.2
+  memory_limit: 500
+  memory_request: 200
+  ephemeral_storage_limit: 2000
+  ephemeral_storage_request: 1000
+
+# {{CUSTOMER_WORKSPACE_FQN}} - Your TrueFoundry workspace FQN
+workspace_fqn: tfy-usea1-devtest:vivek-ks-devtest
+
+allow_interception: false
