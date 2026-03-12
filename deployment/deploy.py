@@ -90,7 +90,7 @@ def deploy_service(args):
             "DATA_DIR": "/app/data",
             "NODE_ENV": "production",
             "SFY_ASSUMED_USER": "truefoundry",
-            "TRUEFOUNDRY_API_URL": args.truefoundry_api_url,
+            "TRUEFOUNDRY_API_URL": args.truefoundry_api_url.rstrip("/") + "/api/svc",
             "TF_SERVICE_API_TOKEN": args.api_token,
             "JOB_FALLBACK_ENABLED": str(args.job_fallback_enabled).lower(),
             "JOB_FALLBACK_TRIGGER_DELAY_MS": str(args.job_fallback_delay),
@@ -180,7 +180,7 @@ examples:
     svc.add_argument(
         "--truefoundry-api-url",
         default=None,
-        help="TrueFoundry control-plane URL  (e.g. https://<host>/api/svc)",
+        help="TrueFoundry control-plane URL  (e.g. https://<host>.truefoundry.tech)",
     )
     svc.add_argument(
         "--api-token",
