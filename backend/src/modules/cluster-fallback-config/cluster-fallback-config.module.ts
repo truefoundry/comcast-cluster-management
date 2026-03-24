@@ -1,16 +1,15 @@
 import { Module } from '@nestjs/common';
-// import { TypeOrmModule } from '@nestjs/typeorm';
-import { ClusterFallbackConfigController } from './cluster-fallback-config.controller';
-import { ClusterFallbackConfigService } from './cluster-fallback-config.service';
-import { FallbackTestController } from './fallback-test.controller';
-import { JobFallbackSchedulerService } from './job-fallback-scheduler.service';
-// import { ClusterFallbackConfig } from '../../entities';
-import { ExternalDataModule } from '../external-data';
+import { SequelizeModule } from '@nestjs/sequelize';
+import { ClusterFallbackConfigController } from './cluster-fallback-config.controller.js';
+import { ClusterFallbackConfigService } from './cluster-fallback-config.service.js';
+import { FallbackTestController } from './fallback-test.controller.js';
+import { JobFallbackSchedulerService } from './job-fallback-scheduler.service.js';
+import { ClusterFallbackConfig } from '../../models/index.js';
+import { ExternalDataModule } from '../external-data/index.js';
 
 @Module({
   imports: [
-    // Uncomment when ready to use PostgreSQL:
-    // TypeOrmModule.forFeature([ClusterFallbackConfig]),
+    SequelizeModule.forFeature([ClusterFallbackConfig]),
     ExternalDataModule,
   ],
   controllers: [ClusterFallbackConfigController, FallbackTestController],
