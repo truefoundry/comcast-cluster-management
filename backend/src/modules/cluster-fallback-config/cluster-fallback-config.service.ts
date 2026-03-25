@@ -124,7 +124,7 @@ export class ClusterFallbackConfigService {
       sourceJobId: createDto.source.jobId || null,
       destinationClusterId: createDto.destination.clusterId,
       destinationWorkspaceId: createDto.destination.workspaceId,
-      destinationWorkspaceFqn: createDto.destination.workspaceFqn || null,
+      destinationWorkspaceFqn: createDto.destination.workspaceFqn,
       createdBy: createdBy || null,
     });
 

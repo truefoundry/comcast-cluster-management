@@ -30,7 +30,7 @@ export class DestinationClusterDto {
   workspaceId: string;
 
   @IsString()
-  @IsOptional()
+  @IsNotEmpty()
   workspaceFqn: string;
 }
 
