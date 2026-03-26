@@ -56,6 +56,7 @@ const ClusterListTable = ({
             <TableHead className="w-12"></TableHead>
             <TableHead className="font-semibold">Fallback Cluster</TableHead>
             <TableHead className="font-semibold">Fallback Workspace</TableHead>
+            <TableHead className="font-semibold">Stuck Threshold</TableHead>
             <TableHead className="font-semibold w-24">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -63,7 +64,7 @@ const ClusterListTable = ({
           {configs.length === 0 ? (
             <TableRow>
               <TableCell
-                colSpan={7}
+                colSpan={8}
                 className="text-center text-muted-foreground py-8"
               >
                 No configurations found
@@ -115,6 +116,11 @@ const ClusterListTable = ({
                 >
                   {getWorkspaceName(config.destination.workspaceId)}
                 </code>
+              </TableCell>
+              <TableCell>
+                <span className="text-sm">
+                  {config.stuckThresholdMinutes} min
+                </span>
               </TableCell>
               <TableCell>
                 <div className="flex items-center gap-2">

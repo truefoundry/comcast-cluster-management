@@ -38,7 +38,9 @@ const EditDrawer = ({
     formData.sourceCluster &&
     formData.sourceWorkspace &&
     formData.destinationCluster &&
-    formData.destinationWorkspace;
+    formData.destinationWorkspace &&
+    formData.stuckThresholdMinutes &&
+    parseInt(formData.stuckThresholdMinutes, 10) >= 1;
 
   return (
     <Drawer direction="right" open={isOpen} onOpenChange={onOpenChange}>

@@ -96,7 +96,6 @@ def deploy_service(args):
             "JOB_FALLBACK_TRIGGER_DELAY_MS": str(args.job_fallback_delay),
             "JOB_FALLBACK_TRIGGER_MAX_RETRIES": str(args.job_fallback_retries),
             "JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS": str(args.job_fallback_retry_delay),
-            "JOB_FALLBACK_STUCK_THRESHOLD_MINUTES": str(args.job_fallback_stuck_threshold),
         },
         ports=[
             Port(
@@ -229,7 +228,6 @@ examples:
     jf.add_argument("--job-fallback-delay", type=int, default=15000, help="trigger delay in ms  (default: 15000)")
     jf.add_argument("--job-fallback-retries", type=int, default=3, help="max retries  (default: 3)")
     jf.add_argument("--job-fallback-retry-delay", type=int, default=15000, help="retry delay in ms  (default: 15000)")
-    jf.add_argument("--job-fallback-stuck-threshold", type=int, default=60, help="stuck threshold in minutes  (default: 60)")
 
     # ── General ──────────────────────────────────────────────────────────
     parser.add_argument("--wait", action="store_true", help="wait for deployment to complete before returning")

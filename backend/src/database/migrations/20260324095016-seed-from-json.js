@@ -34,6 +34,7 @@ module.exports = {
         destinationClusterId: r.destinationClusterId,
         destinationWorkspaceId: r.destinationWorkspaceId,
         destinationWorkspaceFqn: r.destinationWorkspaceFqn,
+        stuckThresholdMinutes: r.stuckThresholdMinutes || 60,
         createdBy: r.createdBy || null,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,

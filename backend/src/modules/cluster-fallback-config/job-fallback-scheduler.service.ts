@@ -31,7 +31,6 @@ interface GroupedFallbackConfigs {
 @Injectable()
 export class JobFallbackSchedulerService implements OnModuleInit {
   private readonly logger = new Logger(JobFallbackSchedulerService.name);
-  private readonly stuckThresholdMinutes: number;
   private readonly enabled: boolean;
   private readonly triggerMaxRetries: number;
   private readonly triggerRetryDelayMs: number;
@@ -44,10 +43,6 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     private readonly fallbackConfigService: ClusterFallbackConfigService,
     private readonly externalDataService: ExternalDataService,
   ) {
-    this.stuckThresholdMinutes = this.configService.get<number>(
-      'JOB_FALLBACK_STUCK_THRESHOLD_MINUTES',
-      60,
-    );
     this.enabled = this.configService.get<boolean>(
       'JOB_FALLBACK_ENABLED',
       false,
@@ -77,19 +72,17 @@ export class JobFallbackSchedulerService implements OnModuleInit {
     }
 
     this.serviceToken = `Bearer ${token}`;
-    this.logger.log(
-      `Job fallback scheduler enabled. Stuck threshold: ${this.stuckThresholdMinutes} minutes`,
-    );
+    this.logger.log('Job fallback scheduler enabled');
   }
 
   /**
-   * Check if a job is stuck based on createdAt timestamp
+   * Check if a job is stuck based on createdAt timestamp and the config's threshold
    */
-  private isJobStuck(jobRun: JobRun): boolean {
+  private isJobStuck(jobRun: JobRun, thresholdMinutes: number): boolean {
     const createdAtMs = jobRun.createdAt;
     const nowMs = Date.now();
     const diffMinutes = (nowMs - createdAtMs) / (1000 * 60);
-    return diffMinutes > this.stuckThresholdMinutes;
+    return diffMinutes > thresholdMinutes;
   }
 
   /**
@@ -403,30 +396,28 @@ export class JobFallbackSchedulerService implements OnModuleInit {
         [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
       );
 
-      // 2. Filter to stuck jobs only
-      const stuckJobs = allJobRuns.filter((jobRun) => this.isJobStuck(jobRun));
-
-      if (stuckJobs.length === 0) {
+      if (allJobRuns.length === 0) {
         this.logger.debug(
-          `No stuck jobs found in ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
+          `No job runs found in ${group.sourceClusterId}/${group.sourceWorkspaceId}`,
         );
         return;
       }
 
-      this.logger.debug(
-        `Found ${stuckJobs.length} stuck jobs out of ${allJobRuns.length} total`,
-      );
-
-      // 3. Process each stuck job
+      // 2. For each job, find the matching config, then check if stuck using that config's threshold
       let totalProcessed = 0;
-      for (const jobRun of stuckJobs) {
+      for (const jobRun of allJobRuns) {
         const matchingConfig = this.findMatchingConfig(jobRun, group);
         if (!matchingConfig) {
-          this.logger.debug(
-            `No matching fallback config for stuck job ${jobRun.name} (app: ${jobRun.applicationId})`,
-          );
           continue;
         }
+
+        if (!this.isJobStuck(jobRun, matchingConfig.stuckThresholdMinutes)) {
+          continue;
+        }
+
+        this.logger.debug(
+          `Job ${jobRun.name} is stuck (threshold: ${matchingConfig.stuckThresholdMinutes} min)`,
+        );
 
         await this.moveJobToDestination(jobRun, matchingConfig);
         totalProcessed++;

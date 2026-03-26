@@ -2,6 +2,8 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
+  IsInt,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -42,4 +44,9 @@ export class CreateClusterFallbackConfigDto {
   @ValidateNested()
   @Type(() => DestinationClusterDto)
   destination: DestinationClusterDto;
+
+  @IsNotEmpty()
+  @IsInt()
+  @Min(1)
+  stuckThresholdMinutes: number;
 }

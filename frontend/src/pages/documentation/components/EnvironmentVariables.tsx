@@ -60,15 +60,6 @@ export const EnvironmentVariables = () => {
           <div className="space-y-4">
             <div className="border-l-2 border-amber-500/50 pl-4">
               <code className="text-sm bg-muted px-2 py-0.5 rounded">
-                JOB_FALLBACK_STUCK_THRESHOLD_MINUTES
-              </code>
-              <p className="text-muted-foreground text-sm mt-1">
-                Time in minutes before a job is considered stuck. Default:{' '}
-                <code className="bg-muted px-1 rounded">60</code>
-              </p>
-            </div>
-            <div className="border-l-2 border-amber-500/50 pl-4">
-              <code className="text-sm bg-muted px-2 py-0.5 rounded">
                 JOB_FALLBACK_TRIGGER_MAX_RETRIES
               </code>
               <p className="text-muted-foreground text-sm mt-1">
