@@ -4,7 +4,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
-import { Op } from 'sequelize';
+import { Op, UniqueConstraintError } from 'sequelize';
 import { ClusterFallbackConfig } from '../../models/index.js';
 import {
   CreateClusterFallbackConfigDto,
@@ -56,79 +56,49 @@ export class ClusterFallbackConfigService {
     };
   }
 
-  /**
-   * Check for duplicate configurations.
-   * Only ONE generic config (no jobId) per source cluster/workspace.
-   * Only ONE job-specific config per source cluster/workspace/jobId.
-   */
-  private async findDuplicateConfig(
+  private throwDuplicateError(
     sourceClusterId: string,
     sourceWorkspaceId: string,
     sourceJobId: string | null,
-    excludeId?: string,
-  ): Promise<ClusterFallbackConfig | null> {
-    const where: Record<string, unknown> = {
-      sourceClusterId,
-      sourceWorkspaceId,
-      sourceJobId: sourceJobId ?? null,
-    };
-
-    if (excludeId) {
-      where.id = { [Op.ne]: excludeId };
+  ): never {
+    if (!sourceJobId) {
+      throw new ConflictException(
+        `A generic fallback config already exists for source cluster "${sourceClusterId}" and workspace "${sourceWorkspaceId}". ` +
+          `Only one generic config (without jobId) is allowed per source cluster/workspace combination.`,
+      );
     }
-
-    return this.configModel.findOne({ where });
-  }
-
-  private async validateNoDuplicate(
-    sourceClusterId: string,
-    sourceWorkspaceId: string,
-    sourceJobId: string | null,
-    excludeId?: string,
-  ): Promise<void> {
-    const duplicate = await this.findDuplicateConfig(
-      sourceClusterId,
-      sourceWorkspaceId,
-      sourceJobId,
-      excludeId,
+    throw new ConflictException(
+      `A fallback config already exists for source cluster "${sourceClusterId}", workspace "${sourceWorkspaceId}", and job "${sourceJobId}". ` +
+        `Only one config per source cluster/workspace/job combination is allowed.`,
     );
-
-    if (duplicate) {
-      if (sourceJobId === null) {
-        throw new ConflictException(
-          `A generic fallback config already exists for source cluster "${sourceClusterId}" and workspace "${sourceWorkspaceId}". ` +
-            `Only one generic config (without jobId) is allowed per source cluster/workspace combination.`,
-        );
-      } else {
-        throw new ConflictException(
-          `A fallback config already exists for source cluster "${sourceClusterId}", workspace "${sourceWorkspaceId}", and job "${sourceJobId}". ` +
-            `Only one config per source cluster/workspace/job combination is allowed.`,
-        );
-      }
-    }
   }
 
   async create(
     createDto: CreateClusterFallbackConfigDto,
     createdBy?: string,
   ): Promise<ClusterFallbackConfigResponse> {
-    await this.validateNoDuplicate(
-      createDto.source.clusterId,
-      createDto.source.workspaceId,
-      createDto.source.jobId || null,
-    );
+    try {
+      const config = await this.configModel.create({
+        sourceClusterId: createDto.source.clusterId,
+        sourceWorkspaceId: createDto.source.workspaceId,
+        sourceJobId: createDto.source.jobId || null,
+        destinationClusterId: createDto.destination.clusterId,
+        destinationWorkspaceId: createDto.destination.workspaceId,
+        destinationWorkspaceFqn: createDto.destination.workspaceFqn,
+        createdBy: createdBy || null,
+      });
 
-    const config = await this.configModel.create({
-      sourceClusterId: createDto.source.clusterId,
-      sourceWorkspaceId: createDto.source.workspaceId,
-      sourceJobId: createDto.source.jobId || null,
-      destinationClusterId: createDto.destination.clusterId,
-      destinationWorkspaceId: createDto.destination.workspaceId,
-      destinationWorkspaceFqn: createDto.destination.workspaceFqn,
-      createdBy: createdBy || null,
-    });
-
-    return this.toResponse(config);
+      return this.toResponse(config);
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) {
+        this.throwDuplicateError(
+          createDto.source.clusterId,
+          createDto.source.workspaceId,
+          createDto.source.jobId || null,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll(): Promise<ClusterFallbackConfigResponse[]> {
@@ -195,15 +165,6 @@ export class ClusterFallbackConfigService {
       throw new NotFoundException(`Configuration with ID ${id} not found`);
     }
 
-    if (updateDto.source) {
-      await this.validateNoDuplicate(
-        updateDto.source.clusterId,
-        updateDto.source.workspaceId,
-        updateDto.source.jobId || null,
-        id,
-      );
-    }
-
     const updates: Partial<ClusterFallbackConfig> = {};
 
     if (updateDto.source) {
@@ -218,8 +179,19 @@ export class ClusterFallbackConfigService {
       updates.destinationWorkspaceFqn = updateDto.destination.workspaceFqn;
     }
 
-    await config.update(updates);
-    return this.toResponse(config);
+    try {
+      await config.update(updates);
+      return this.toResponse(config);
+    } catch (error) {
+      if (error instanceof UniqueConstraintError) {
+        this.throwDuplicateError(
+          updateDto.source?.clusterId ?? config.sourceClusterId,
+          updateDto.source?.workspaceId ?? config.sourceWorkspaceId,
+          updateDto.source?.jobId || null,
+        );
+      }
+      throw error;
+    }
   }
 
   async remove(id: string): Promise<void> {
