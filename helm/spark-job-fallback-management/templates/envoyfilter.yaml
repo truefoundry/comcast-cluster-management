@@ -1,0 +1,117 @@
+{{- if .Values.auth.enabled -}}
+{{- $fullName := include "spark-job-fallback-management.fullname" . -}}
+{{- $host := .Values.ingress.host -}}
+{{- $tfyHost := .Values.auth.truefoundryInternalHost -}}
+{{- $clientId := required "auth.clientId is required when auth is enabled" .Values.auth.clientId -}}
+{{- $sdsUri := .Values.auth.sdsServerUri -}}
+{{- $port := .Values.service.port -}}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: {{ $fullName }}-tfy-oauth2
+  labels:
+    {{- include "spark-job-fallback-management.labels" . | nindent 4 }}
+spec:
+  configPatches:
+    - applyTo: CLUSTER
+      match:
+        context: SIDECAR_OUTBOUND
+      patch:
+        operation: ADD
+        value:
+          name: tfy-oauth2
+          connect_timeout: 5s
+          type: LOGICAL_DNS
+          dns_lookup_family: V4_ONLY
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: tfy-oauth2
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ $tfyHost }}
+                          port_value: 443
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              sni: {{ $tfyHost }}
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.jwt_authn
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.tfy-oauth
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.filters.http.oauth2.v3.OAuth2
+            config:
+              token_endpoint:
+                cluster: tfy-oauth2
+                timeout: 5s
+                uri: https://{{ $tfyHost }}/api/svc/v1/oauth2-proxy/token
+              authorization_endpoint: https://{{ $tfyHost }}/api/svc/v1/oauth2-proxy/authorize
+              redirect_uri: https://{{ $host }}{{ .Values.auth.callbackPath }}
+              redirect_path_matcher:
+                path:
+                  exact: {{ .Values.auth.callbackPath }}
+              signout_path:
+                path:
+                  exact: {{ .Values.auth.signoutPath }}
+              credentials:
+                client_id: {{ $clientId }}
+                token_secret:
+                  name: token
+                  sds_config:
+                    api_config_source:
+                      api_type: GRPC
+                      grpc_services:
+                        - google_grpc:
+                            target_uri: {{ $sdsUri }}
+                            stat_prefix: stat_
+                      transport_api_version: V3
+                hmac_secret:
+                  name: hmac
+                  sds_config:
+                    api_config_source:
+                      api_type: GRPC
+                      grpc_services:
+                        - google_grpc:
+                            target_uri: {{ $sdsUri }}
+                            stat_prefix: stat_
+                      transport_api_version: V3
+              forward_bearer_token: true
+              pass_through_matcher:
+                - name: Authorization
+                  present_match: true
+              auth_scopes:
+                - offline_access
+              auth_type: BASIC_AUTH
+              default_refresh_token_expires_in: {{ .Values.auth.refreshTokenExpiresIn }}
+              use_refresh_token: true
+    - applyTo: HTTP_ROUTE
+      match:
+        context: SIDECAR_INBOUND
+        routeConfiguration:
+          vhost:
+            name: inbound|http|{{ $port }}
+      patch:
+        operation: MERGE
+        value:
+          match:
+            case_sensitive: true
+            prefix: /
+          route:
+            prefix_rewrite: /
+  workloadSelector:
+    labels:
+      {{- include "spark-job-fallback-management.selectorLabels" . | nindent 6 }}
+{{- end }}
