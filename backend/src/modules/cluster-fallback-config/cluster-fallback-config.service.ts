@@ -135,26 +135,6 @@ export class ClusterFallbackConfigService {
     return this.toResponse(config);
   }
 
-  async findBySourceCluster(
-    clusterId: string,
-  ): Promise<ClusterFallbackConfigResponse[]> {
-    const configs = await this.configModel.findAll({
-      where: { sourceClusterId: clusterId },
-      order: [['createdAt', 'DESC']],
-    });
-    return configs.map((config) => this.toResponse(config));
-  }
-
-  async findBySourceWorkspace(
-    workspaceId: string,
-  ): Promise<ClusterFallbackConfigResponse[]> {
-    const configs = await this.configModel.findAll({
-      where: { sourceWorkspaceId: workspaceId },
-      order: [['createdAt', 'DESC']],
-    });
-    return configs.map((config) => this.toResponse(config));
-  }
-
   async update(
     id: string,
     updateDto: UpdateClusterFallbackConfigDto,
