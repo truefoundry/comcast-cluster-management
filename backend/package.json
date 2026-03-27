@@ -18,12 +18,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "typeorm": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js -d src/data-source.ts",
-    "migration:generate": "npm run typeorm -- migration:generate src/migrations/$npm_config_name",
-    "migration:create": "npm run typeorm -- migration:create src/migrations/$npm_config_name",
-    "migration:run": "npm run typeorm -- migration:run",
-    "migration:revert": "npm run typeorm -- migration:revert",
-    "migration:show": "npm run typeorm -- migration:show"
+    "migration:generate": "npx sequelize-cli migration:generate --name",
+    "migration:run": "npx sequelize-cli db:migrate",
+    "migration:undo": "npx sequelize-cli db:migrate:undo",
+    "migration:status": "npx sequelize-cli db:migrate:status"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -31,16 +29,18 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/schedule": "^6.1.0",
+    "@nestjs/sequelize": "^11.0.0",
     "@nestjs/serve-static": "^5.0.4",
-    "@nestjs/typeorm": "^11.0.0",
     "axios": "^1.13.2",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "dotenv": "^17.2.3",
-    "pg": "^8.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.28",
+    "sequelize": "^6.37.5",
+    "sequelize-cli": "^6.6.5",
+    "sequelize-typescript": "^2.1.6",
+    "sqlite3": "^5.1.7",
     "uuid": "^11.0.0"
   },
   "devDependencies": {

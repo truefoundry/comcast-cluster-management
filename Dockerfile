@@ -23,10 +23,14 @@ COPY --from=backend-build /app/backend/dist ./dist
 COPY --from=backend-build /app/backend/node_modules ./node_modules
 COPY --from=backend-build /app/backend/package.json ./
 
+# Copy Sequelize migration files and config
+COPY --from=backend-build /app/backend/.sequelizerc ./
+COPY --from=backend-build /app/backend/src/database ./src/database
+
 # Copy frontend build to public folder
 COPY --from=frontend-build /app/frontend/dist ./public
 
-# Create data directory for JSON storage (will be mounted as volume in production)
+# Create data directory (will be mounted as volume in production)
 RUN mkdir -p /app/data && chown -R node:node /app/data
 
 # Set environment variables
@@ -37,4 +41,5 @@ USER node
 
 EXPOSE 8000
 
-CMD ["node", "dist/main.js"]
+COPY --chown=node:node entrypoint.sh ./
+CMD ["sh", "entrypoint.sh"]

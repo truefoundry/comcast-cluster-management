@@ -1,16 +1,14 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-// import { ConfigService } from '@nestjs/config'; // Uncomment when using TypeORM
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ServeStaticModule } from '@nestjs/serve-static';
-// import { TypeOrmModule } from '@nestjs/typeorm';
+import { SequelizeModule } from '@nestjs/sequelize';
 import { join } from 'path';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
+import { AppController } from './app.controller.js';
+import { AppService } from './app.service.js';
 
-// Feature modules
-import { ExternalDataModule } from './modules/external-data';
-import { ClusterFallbackConfigModule } from './modules/cluster-fallback-config';
+import { ExternalDataModule } from './modules/external-data/index.js';
+import { ClusterFallbackConfigModule } from './modules/cluster-fallback-config/index.js';
 
 @Module({
   imports: [
@@ -20,30 +18,41 @@ import { ClusterFallbackConfigModule } from './modules/cluster-fallback-config';
     ScheduleModule.forRoot(),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'public'),
-      exclude: ['/api/(.*)'], // Exclude API routes from static serving
+      exclude: ['/api/(.*)'],
     }),
-    // ============================================================
-    // DATABASE CONFIGURATION (Commented out for JSON file storage)
-    // Uncomment when ready to use PostgreSQL
-    // ============================================================
-    // TypeOrmModule.forRootAsync({
-    //   imports: [ConfigModule],
-    //   inject: [ConfigService],
-    //   useFactory: (configService: ConfigService) => ({
-    //     type: 'postgres',
-    //     host: configService.get('DB_HOST', 'localhost'),
-    //     port: configService.get<number>('DB_PORT', 5432),
-    //     username: configService.get('DB_USERNAME', 'admin'),
-    //     password: configService.get('DB_PASSWORD', 'admin123'),
-    //     database: configService.get('DB_NAME', 'cluster_management'),
-    //     entities: [__dirname + '/**/*.entity{.ts,.js}'],
-    //     migrations: [__dirname + '/migrations/*{.ts,.js}'],
-    //     synchronize: false, // Always run migrations manually
-    //     migrationsRun: false, // Don't auto-run migrations on startup
-    //     logging: configService.get('NODE_ENV') !== 'production',
-    //   }),
-    // }),
-    // Feature modules
+    SequelizeModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const dialect = configService.get<string>('DB_DIALECT', 'sqlite');
+
+        const baseConfig = {
+          autoLoadModels: true,
+          synchronize: false,
+          // TODO: disable logging in production
+          logging: console.log,
+        };
+
+        if (dialect === 'sqlite') {
+          const dataDir = configService.get<string>('DATA_DIR', './data');
+          return {
+            ...baseConfig,
+            dialect: 'sqlite' as const,
+            storage: join(dataDir, 'database.sqlite'),
+          };
+        }
+
+        return {
+          ...baseConfig,
+          dialect: 'postgres' as const,
+          host: configService.get('DB_HOST', 'localhost'),
+          port: configService.get<number>('DB_PORT', 5432),
+          username: configService.get('DB_USERNAME'),
+          password: configService.get('DB_PASSWORD'),
+          database: configService.get('DB_NAME'),
+        };
+      },
+    }),
     ExternalDataModule,
     ClusterFallbackConfigModule,
   ],
