@@ -25,12 +25,12 @@ import { ClusterFallbackConfigModule } from './modules/cluster-fallback-config/i
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         const dialect = configService.get<string>('DB_DIALECT', 'sqlite');
-        const isProduction = configService.get('NODE_ENV') === 'production';
 
         const baseConfig = {
           autoLoadModels: true,
           synchronize: false,
-          logging: isProduction ? false : console.log,
+          // TODO: disable logging in production
+          logging: console.log,
         };
 
         if (dialect === 'sqlite') {
