@@ -393,7 +393,7 @@ export class JobFallbackSchedulerService implements OnModuleInit {
       const allJobRuns = await this.fetchAllJobRuns(
         group.sourceClusterId,
         group.sourceWorkspaceId,
-        [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+        [JobRunStatus.CREATED, JobRunStatus.SCHEDULED, JobRunStatus.RUNNING],
       );
 
       if (allJobRuns.length === 0) {

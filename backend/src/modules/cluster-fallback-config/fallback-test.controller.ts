@@ -313,7 +313,11 @@ export class FallbackTestController {
             source.sourceClusterId,
             source.sourceWorkspaceId,
             {
-              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+              status: [
+                JobRunStatus.CREATED,
+                JobRunStatus.SCHEDULED,
+                JobRunStatus.RUNNING,
+              ],
               limit: 100,
             },
           );
