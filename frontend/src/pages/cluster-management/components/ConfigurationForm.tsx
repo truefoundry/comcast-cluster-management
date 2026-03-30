@@ -17,6 +17,7 @@ export interface ConfigurationFormData {
   sourceJobId: string;
   destinationCluster: string;
   destinationWorkspace: string;
+  stuckThresholdMinutes: string;
 }
 
 interface ConfigurationFormProps {
@@ -194,6 +195,35 @@ const ConfigurationForm = ({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      <div className="h-px bg-border" />
+
+      {/* Stuck Threshold */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          Stuck Threshold
+        </h3>
+
+        <div className="space-y-2">
+          <Label htmlFor={`${idPrefix}-stuck-threshold`}>
+            Threshold (minutes)
+          </Label>
+          <Input
+            id={`${idPrefix}-stuck-threshold`}
+            type="number"
+            min={1}
+            placeholder="e.g. 60"
+            value={formData.stuckThresholdMinutes}
+            onChange={(e) =>
+              updateField('stuckThresholdMinutes', e.target.value)
+            }
+          />
+          <p className="text-xs text-muted-foreground">
+            Time in minutes before a job is considered stuck and moved to the
+            fallback destination.
+          </p>
         </div>
       </div>
     </div>

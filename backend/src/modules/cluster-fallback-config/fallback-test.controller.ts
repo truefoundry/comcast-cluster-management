@@ -257,10 +257,6 @@ export class FallbackTestController {
   @Get('preview-fallback')
   async previewFallback() {
     const token = this.getServiceToken();
-    const stuckThresholdMinutes = this.configService.get<number>(
-      'JOB_FALLBACK_STUCK_THRESHOLD_MINUTES',
-      60,
-    );
 
     // Get all fallback configs
     const configs = await this.fallbackConfigService.findAll();
@@ -295,7 +291,7 @@ export class FallbackTestController {
       groupedSources.get(key)!.configCount++;
     }
 
-    // Find stuck jobs for each source
+    // Find stuck jobs for each source using per-config thresholds
     const stuckJobs: Array<{
       jobRunId: string;
       jobRunName: string;
@@ -305,6 +301,7 @@ export class FallbackTestController {
       sourceWorkspaceId: string;
       createdAt: number;
       stuckMinutes: number;
+      stuckThresholdMinutes: number;
       matchingConfigId?: string;
     }> = [];
 
@@ -316,7 +313,11 @@ export class FallbackTestController {
             source.sourceClusterId,
             source.sourceWorkspaceId,
             {
-              status: [JobRunStatus.CREATED, JobRunStatus.SCHEDULED],
+              status: [
+                JobRunStatus.CREATED,
+                JobRunStatus.SCHEDULED,
+                JobRunStatus.RUNNING,
+              ],
               limit: 100,
             },
           );
@@ -326,15 +327,24 @@ export class FallbackTestController {
         for (const jobRun of jobRuns) {
           const diffMinutes = (nowMs - jobRun.createdAt) / (1000 * 60);
 
-          if (diffMinutes > stuckThresholdMinutes) {
-            // Find matching config
-            const matchingConfig = configs.find(
+          // Find matching config (job-specific first, then generic)
+          const matchingConfig =
+            configs.find(
               (c) =>
                 c.source.clusterId === source.sourceClusterId &&
                 c.source.workspaceId === source.sourceWorkspaceId &&
-                (!c.source.jobId || c.source.jobId === jobRun.applicationId),
+                c.source.jobId === jobRun.applicationId,
+            ) ||
+            configs.find(
+              (c) =>
+                c.source.clusterId === source.sourceClusterId &&
+                c.source.workspaceId === source.sourceWorkspaceId &&
+                !c.source.jobId,
             );
 
+          if (!matchingConfig) continue;
+
+          if (diffMinutes > matchingConfig.stuckThresholdMinutes) {
             stuckJobs.push({
               jobRunId: jobRun.id,
               jobRunName: jobRun.name,
@@ -344,7 +354,8 @@ export class FallbackTestController {
               sourceWorkspaceId: source.sourceWorkspaceId,
               createdAt: jobRun.createdAt,
               stuckMinutes: Math.round(diffMinutes),
-              matchingConfigId: matchingConfig?.id,
+              stuckThresholdMinutes: matchingConfig.stuckThresholdMinutes,
+              matchingConfigId: matchingConfig.id,
             });
           }
         }
@@ -358,12 +369,12 @@ export class FallbackTestController {
         totalConfigs: configs.length,
         uniqueSources: groupedSources.size,
         stuckJobsFound: stuckJobs.length,
-        stuckThresholdMinutes,
       },
       configs: configs.map((c) => ({
         id: c.id,
         source: c.source,
         destination: c.destination,
+        stuckThresholdMinutes: c.stuckThresholdMinutes,
       })),
       stuckJobs,
     };

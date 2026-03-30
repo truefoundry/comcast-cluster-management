@@ -34,6 +34,9 @@ export class ClusterFallbackConfig extends Model {
   @Column({ type: DataType.STRING, allowNull: false })
   declare destinationWorkspaceFqn: string;
 
+  @Column({ type: DataType.INTEGER, allowNull: false })
+  declare stuckThresholdMinutes: number;
+
   @Column({ type: DataType.STRING, allowNull: true })
   declare createdBy: string | null;
 

@@ -23,6 +23,7 @@ export interface ClusterFallbackConfigResponse {
     workspaceId: string;
     workspaceFqn: string;
   };
+  stuckThresholdMinutes: number;
   createdBy?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -50,6 +51,7 @@ export class ClusterFallbackConfigService {
         workspaceId: config.destinationWorkspaceId,
         workspaceFqn: config.destinationWorkspaceFqn,
       },
+      stuckThresholdMinutes: config.stuckThresholdMinutes,
       createdBy: config.createdBy || undefined,
       createdAt: config.createdAt,
       updatedAt: config.updatedAt,
@@ -85,6 +87,7 @@ export class ClusterFallbackConfigService {
         destinationClusterId: createDto.destination.clusterId,
         destinationWorkspaceId: createDto.destination.workspaceId,
         destinationWorkspaceFqn: createDto.destination.workspaceFqn,
+        stuckThresholdMinutes: createDto.stuckThresholdMinutes,
         createdBy: createdBy || null,
       });
 
@@ -157,6 +160,10 @@ export class ClusterFallbackConfigService {
       updates.destinationClusterId = updateDto.destination.clusterId;
       updates.destinationWorkspaceId = updateDto.destination.workspaceId;
       updates.destinationWorkspaceFqn = updateDto.destination.workspaceFqn;
+    }
+
+    if (updateDto.stuckThresholdMinutes !== undefined) {
+      updates.stuckThresholdMinutes = updateDto.stuckThresholdMinutes;
     }
 
     try {

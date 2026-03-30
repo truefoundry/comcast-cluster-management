@@ -54,7 +54,6 @@ The fallback config stores `destinationWorkspaceFqn` directly. This eliminates t
 | `TF_SERVICE_API_TOKEN` | **Required** - Service-level TrueFoundry API token for cronjob authentication | - |
 | `TF_USER_API_TOKEN` | User-level TrueFoundry API token (for local development fallback in controllers) | - |
 | `JOB_FALLBACK_ENABLED` | Enable/disable the scheduler | `false` |
-| `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` | Time threshold (in minutes) to consider a job stuck | `60` |
 
 ## Cron Schedule
 
@@ -78,6 +77,5 @@ The scheduler will:
 
 1. Set `TF_SERVICE_API_TOKEN` with a valid service account token
 2. Set `JOB_FALLBACK_ENABLED=true`
-3. Optionally adjust `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` (default: 60)
-4. Restart the backend service
+3. Restart the backend service
 

@@ -27,6 +27,7 @@ export interface ClusterFallbackConfig {
   id: string;
   source: SourceClusterInfo;
   destination: ClusterInfo;
+  stuckThresholdMinutes: number;
   createdBy?: string;
   createdAt?: string;
   updatedAt?: string;
@@ -44,6 +45,7 @@ export interface CreateClusterFallbackConfigPayload {
     workspaceId: string;
     workspaceFqn?: string;
   };
+  stuckThresholdMinutes: number;
 }
 
 export interface UpdateClusterFallbackConfigPayload {
@@ -57,4 +59,5 @@ export interface UpdateClusterFallbackConfigPayload {
     workspaceId: string;
     workspaceFqn?: string;
   };
+  stuckThresholdMinutes?: number;
 }

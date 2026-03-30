@@ -22,6 +22,7 @@ const initialFormData: ConfigurationFormData = {
   sourceJobId: '',
   destinationCluster: '',
   destinationWorkspace: '',
+  stuckThresholdMinutes: '',
 };
 
 const ClusterManagement = () => {
@@ -146,6 +147,7 @@ const ClusterManagement = () => {
           workspaceId: createFormData.destinationWorkspace,
           workspaceFqn: destWorkspace?.fqn,
         },
+        stuckThresholdMinutes: parseInt(createFormData.stuckThresholdMinutes, 10),
       });
       setCreateFormData(initialFormData);
       setIsCreateDrawerOpen(false);
@@ -188,6 +190,7 @@ const ClusterManagement = () => {
           workspaceId: editFormData.destinationWorkspace,
           workspaceFqn: destWorkspace?.fqn,
         },
+        stuckThresholdMinutes: parseInt(editFormData.stuckThresholdMinutes, 10),
       });
       setIsEditDrawerOpen(false);
       setConfigToEdit(null);
@@ -214,6 +217,7 @@ const ClusterManagement = () => {
       sourceJobId: config.source.jobId ?? '',
       destinationCluster: config.destination.clusterId,
       destinationWorkspace: config.destination.workspaceId,
+      stuckThresholdMinutes: config.stuckThresholdMinutes.toString(),
     });
     setIsEditDrawerOpen(true);
   };
