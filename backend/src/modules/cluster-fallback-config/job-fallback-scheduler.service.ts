@@ -146,9 +146,16 @@ export class JobFallbackSchedulerService implements OnModuleInit {
    * Pattern: ^[a-z](?:[a-z0-9]|-(?!-)){1,30}[a-z0-9]$ (max 32 chars)
    */
   private generateFallbackName(baseName: string): string {
-    const sanitized = baseName.replace(/^-+|-+$/g, '');
+    const MAX_LENGTH = 32;
+    const SUFFIX = '-fallback';
+    let sanitized = baseName.replace(/^-+|-+$/g, '');
 
-    let result = `${sanitized}-fallback`;
+    const maxBaseLength = MAX_LENGTH - SUFFIX.length;
+    if (sanitized.length > maxBaseLength) {
+      sanitized = sanitized.substring(0, maxBaseLength).replace(/-+$/, '');
+    }
+
+    let result = `${sanitized}${SUFFIX}`;
 
     if (!/^[a-z]/.test(result)) {
       result = 'j' + result.substring(1);
