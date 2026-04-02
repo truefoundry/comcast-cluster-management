@@ -1,0 +1,13 @@
+apiVersion: v2
+name: spark-job-fallback-management
+description: A Helm chart for Spark Job Fallback Management service - manages cluster fallback configurations
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Vivek
+keywords:
+  - spark
+  - job-management
+  - fallback
+  - cluster-management
