@@ -1,4 +1,4 @@
-import { IsOptional, ValidateNested } from 'class-validator';
+import { IsOptional, IsInt, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
   SourceClusterDto,
@@ -15,4 +15,9 @@ export class UpdateClusterFallbackConfigDto {
   @Type(() => DestinationClusterDto)
   @IsOptional()
   destination?: DestinationClusterDto;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  stuckThresholdMinutes?: number;
 }

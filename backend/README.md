@@ -114,7 +114,6 @@ TrueFoundry API client providing:
 | `TRUEFOUNDRY_API_URL` | TrueFoundry API base URL | `https://internal.devtest.truefoundry.tech/api/svc` |
 | `TF_SERVICE_API_TOKEN` | Service account token for API calls | - |
 | `JOB_FALLBACK_ENABLED` | Enable/disable the fallback scheduler | `false` |
-| `JOB_FALLBACK_STUCK_THRESHOLD_MINUTES` | Minutes before a job is considered stuck | `60` |
 | `JOB_FALLBACK_TRIGGER_MAX_RETRIES` | Max retries for job trigger/terminate | `3` |
 | `JOB_FALLBACK_TRIGGER_RETRY_DELAY_MS` | Delay between retries | `3000` |
 | `JOB_FALLBACK_TRIGGER_DELAY_MS` | Wait time before triggering job | `5000` |
